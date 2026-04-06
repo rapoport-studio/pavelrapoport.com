@@ -77,4 +77,5 @@ standards, and conventions as persistent context.
 - `messages` — Canvas mode serves the chat interface
 - `studio` — Architect and Builder modes serve the pipeline
 - `projects` — agent operates within project scope
+- `integrations` — AI model connections feed into the agent
 - `finance` — token costs feed into finance

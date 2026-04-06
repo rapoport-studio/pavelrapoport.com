@@ -266,6 +266,28 @@ code writing. One agent, multiple modes.
 
 ---
 
+### `integrations`
+
+**What:** Platform-level integration layer. Two concepts:
+Integration (driver — "we can talk to Linear") and Connection
+(instance — "project X is connected to workspace Y").
+
+**For whom:** Pavel (configures), the system (syncs data),
+eventually clients and network members (connect their tools).
+
+**Why it exists:** The studio orchestrates 21 external services.
+Each needs auth, config, status, and a shared interface.
+Without this, every domain reinvents how to talk outside.
+
+**What's inside:**
+- Integration registry — 21 supported types in 7 categories
+- Connections — global (platform) or project-scoped instances
+- Unified interface — connect(), disconnect(), status(), sync()
+- Config management — encrypted credentials, health checks
+- Sync events — audit log of all data exchange
+
+---
+
 ### `auth`
 
 **What:** Authentication and authorization across the

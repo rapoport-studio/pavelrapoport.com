@@ -45,6 +45,7 @@ context: |
   - network — contacts, partners, referrals
   - messages — client communication, notifications
   - ai — AI agents, automation, internal tooling
+  - integrations — universal connectors to external services (21 types, 7 categories)
 
   ## Site Structure
   Public (no auth):

@@ -93,3 +93,4 @@ to `finance`.
 - `studio` — where the project is managed
 - `ai` — executes within project scope
 - `finance` — project budget and costs
+- `integrations` — project-scoped connections to external services
