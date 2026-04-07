@@ -63,7 +63,13 @@ to an organization.
 - **AND** it belongs to the currently active organization
 - **AND** created_by records who created it
 
-Status lifecycle: shaping → speccing → building → delivered
+Status lifecycle: draft → shaping → speccing → building → delivered
+
+#### Scenario: Draft project auto-creation
+- **WHEN** AI Listener detects a new idea from any channel
+- **THEN** a draft project is created with extracted entities
+- **AND** specs are marked [DRAFT]
+- **AND** a review task is created for Pavel
 
 #### Scenario: Project belongs to organization
 - **GIVEN** a project is created under "Dentour Ltd"

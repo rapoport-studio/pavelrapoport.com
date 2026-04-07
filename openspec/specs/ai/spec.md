@@ -28,6 +28,11 @@ Modes:
 - **Scout** — scans existing codebases, extracts specs
 - **Architect** — takes tasks, generates proposal → design → tasks
 - **Builder** — executes approved plans, writes code, opens PRs
+- **Listener** — background process, ingests ideas from any channel
+  (voice, text, email), classifies (new idea / enrichment of existing),
+  extracts entities, creates draft projects, generates draft specs.
+  Adapts spec style by sphere: government (security focus),
+  business (speed focus), creative (minimal specs, fast POC)
 
 ### Requirement: Agent Configuration
 
