@@ -133,11 +133,128 @@ Project connections (pavelrapoport):
 After seed:
 - [ ] Pavel can login via hello@pavelrapoport.com
 - [ ] Profile exists with role = admin
-- [ ] Organization "Pavel Rapoport" exists
-- [ ] Pavel is owner of the organization
+- [ ] Organization "Pavel Rapoport" exists, Pavel is owner
 - [ ] Project "pavelrapoport.com" exists under the org
 - [ ] Domain pavelrapoport.com is active
 - [ ] Subdomains @ and studio.* are mapped
 - [ ] Global connections (Claude, Google, PostHog) are active
 - [ ] Project connections (GitHub, Linear, Cloudflare, Supabase) are active
 - [ ] AI agent can read Gmail via Google Workspace connection
+
+---
+
+# VIVOD — Partnership Project
+
+## Partner Profile
+
+```
+Profile:
+  email: (Misha's email)
+  display_name: Misha
+  role: user
+```
+
+## Organization
+
+```
+Organization:
+  name: VIVOD
+  slug: vivod
+  type: partnership
+
+  Members:
+    - Pavel
+      org_role: owner
+      role_title: CTO — product, technology, AI architecture
+
+    - Misha
+      org_role: owner
+      role_title: CEO — business, domain expertise, sales
+
+  Origin:
+    how_met: long-time friends, different domains
+    trigger: conversation during war (sirens), Misha's pain
+      in facade construction management + Pavel's need to build
+    first_conversation: (date)
+    spark_to_spec: Misha described the problem,
+      Pavel shaped it into a product
+```
+
+## Domain
+
+```
+Domain:
+  name: vivod.app
+  organization: vivod
+  dns_provider: cloudflare
+  status: active
+
+  Subdomains:
+    - prefix: @
+      project: vivod-platform
+      environment: production
+```
+
+## Project
+
+```
+Project:
+  name: VIVOD Platform
+  slug: vivod-platform
+  organization: vivod
+  status: building
+  created_by: Pavel
+
+  Pilot clients:
+    - Gishat Havalim
+    - Euro Towers
+
+  Stage: Build (Stage 4 of partnership lifecycle)
+```
+
+## Connections (project: vivod-platform)
+
+```
+Project connections (vivod-platform):
+
+  - type: github
+    scope: project
+    config:
+      owner: (github org)
+      repo: vivod
+      default_branch: main
+      token: (secret)
+
+  - type: linear
+    scope: project
+    config:
+      workspace: AI Development Studio
+      team: VIVOD
+      api_key: (secret)
+
+  - type: supabase
+    scope: project
+    config:
+      project_url: (secret)
+      anon_key: (secret)
+      service_role_key: (secret)
+
+  - type: cloudflare
+    scope: project
+    config:
+      account_id: (secret)
+      project_name: vivod
+      api_token: (secret)
+```
+
+## VIVOD Verification Checklist
+
+After seed:
+- [ ] Misha can login and see VIVOD organization
+- [ ] Both Pavel and Misha are owners
+- [ ] Project "VIVOD Platform" exists under VIVOD org
+- [ ] Domain vivod.app is active
+- [ ] Project connections (GitHub, Linear, Supabase, Cloudflare) active
+- [ ] Pavel can switch between "Pavel Rapoport" and "VIVOD" orgs
+- [ ] Misha cannot see "Pavel Rapoport" org data
+- [ ] Pilot clients tracked in project

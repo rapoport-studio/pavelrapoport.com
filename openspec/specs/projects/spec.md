@@ -185,6 +185,18 @@ organization membership.
   (via `integrations`)
 - **ProjectAssignment** — network member assigned to project.
   Has: project_id, network_member_id, role, brief
+- **Idea** — pre-project concept.
+  Has: id, problem_statement, ai_leverage_score,
+  market_estimate, source_contact_id, created_by, created_at
+- **DecisionLog** — key decision record.
+  Has: id, project_id, organization_id, date, decision,
+  context, decided_by, outcome, linked_to_type, linked_to_id
+- **Milestone** — trackable checkpoint per stage.
+  Has: id, project_id, title, stage, due_at,
+  completed_at, status
+- **PilotClient** — pilot customer for validation.
+  Has: id, project_id, name, criteria, feedback,
+  outcome (success/fail/pivot), started_at, completed_at
 
 ## Dependencies
 

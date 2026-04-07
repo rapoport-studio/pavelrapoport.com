@@ -213,6 +213,12 @@ The system SHALL support switching between organizations.
 - **Invitation** — a pending invite to join an org.
   Has: id, organization_id, email, role, invited_by,
   status (pending/accepted/expired), expires_at
+- **FoundersAgreement** — partnership terms (extends Contract).
+  Has: id, organization_id, roles, equity_split,
+  vesting_schedule, decision_rights, exit_terms, signed_at
+- **PartnershipStage** — current lifecycle stage.
+  Has: id, organization_id, stage (0-5), checklist_completion,
+  entered_at, completed_at
 
 ## Dependencies
 
