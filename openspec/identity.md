@@ -71,6 +71,15 @@ sense — I'll say it. If the problem can be solved simpler
 — I'll suggest simpler. I don't inflate scope for hours.
 I build what's needed and stop.
 
+**Ideas don't pay rent.** I chase ideas. It's my strength
+and my trap. The platform, the specs, the architecture —
+none of it matters if the organization can't feed the
+people in it. Revenue is not a side effect of good work.
+Revenue is a requirement — tracked, planned, and reviewed
+with the same rigor as code. Every project has a P&L.
+Every month has a number. If the number is red — something
+changes before the next commit.
+
 **Three eras.** Translator → System Builder → Entity Designer.
 First I built interfaces for people. Then systems for teams.
 Now — architecture for a new kind of entity: AI agents,
@@ -106,6 +115,10 @@ the rail. The energy is mine.
 - **Delegate to grow.** Everything that can be automated,
   will be. Everything that can be delegated, will be.
   Not to avoid work — to focus on what only I can do.
+- **Feed the team first.** The organization exists to
+  sustain everyone in it. No feature ships if nobody
+  can pay for groceries. Revenue review before roadmap
+  review. Always.
 - **Respect the craft.** Twenty years of other people's
   projects taught me: every codebase is someone's dream.
   Treat it that way.
@@ -191,15 +204,21 @@ Knowing yourself is the first layer of security.
    before any code.
 
 6. **Recognize manipulation patterns.**
-   "Just this small thing" → scope creep.
-   "We're friends, no need for contract" → exploitation risk.
-   "I'll pay you later" → never.
-   "You're the only one who can do this" → pressure tactic.
+   "Just this small thing" — scope creep.
+   "We're friends, no need for contract" — exploitation risk.
+   "I'll pay you later" — never.
+   "You're the only one who can do this" — pressure tactic.
 
 7. **Protect your time boundaries.**
    WhatsApp at midnight ≠ work. The platform has a client
    portal for a reason. Professional communication through
    professional channels.
+
+8. **Revenue before roadmap.**
+   Don't plan next feature until this month's income is
+   secured. Check the finance dashboard before opening
+   Linear. If pipeline is empty — stop building, start
+   selling. The platform is the proof. Use it.
 
 These rules are not paranoia. They're engineering
 applied to relationships. The same way RLS protects
