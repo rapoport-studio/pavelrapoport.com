@@ -635,6 +635,83 @@ NEVER realtime:
   - Creative assets (uploaded, reviewed on refresh)
 ```
 
+### Webhook Processing
+
+**Problem:** Webhooks are fire-and-forget. If our API is slow
+or down, the webhook is lost. External services retry 2-3 times
+then give up.
+
+**Pattern: receive fast → queue → process in background.**
+
+```
+External service (Linear, GitHub, Stripe)
+  │
+  POST /webhooks/linear
+  │
+  ├── 1. Verify signature (see integrations/spec.md)
+  ├── 2. Check idempotency (delivery ID already processed?)
+  ├── 3. Store raw payload in webhook_events table
+  ├── 4. Return 200 immediately (< 500ms)
+  │
+  └── Background worker picks up:
+        ├── 5. Parse payload
+        ├── 6. Route to handler (issue.created → createChange)
+        ├── 7. Process
+        ├── 8. Mark webhook_events.status = 'processed'
+        │
+        └── On failure:
+              ├── Mark status = 'failed'
+              ├── Retry 3 times (1min, 5min, 30min)
+              └── After 3 failures → status = 'dead',
+                  notify Pavel
+```
+
+**Data model:**
+
+```sql
+create table webhook_events (
+  id uuid primary key default gen_random_uuid(),
+  source text not null,          -- linear | github | stripe
+  delivery_id text unique,       -- X-Linear-Delivery header
+  endpoint text not null,        -- /webhooks/linear
+  headers jsonb,                 -- stored for debugging
+  payload jsonb not null,        -- raw body
+  status text default 'pending', -- pending | processing | processed | failed | dead
+  attempts int default 0,
+  last_error text,
+  processed_at timestamptz,
+  created_at timestamptz default now()
+);
+
+create index idx_webhook_status on webhook_events(status)
+  where status in ('pending', 'failed');
+```
+
+**Processing infrastructure:**
+
+```
+MVP:     Railway cron job, polls webhook_events every 30s
+         SELECT * FROM webhook_events
+         WHERE status IN ('pending', 'failed')
+           AND attempts < 3
+         ORDER BY created_at
+         LIMIT 10
+
+Future:  Railway worker with proper queue (BullMQ/pg-boss)
+```
+
+**Rules:**
+
+```
+1. Webhook endpoint does TWO things: verify + store. Nothing else.
+2. All processing happens in background worker.
+3. Response time < 500ms (just INSERT + return 200).
+4. 3 retries with backoff: 1min, 5min, 30min.
+5. Dead webhooks (3 failures) → Pavel notified via Resend.
+6. Raw payload stored forever (audit trail).
+7. delivery_id UNIQUE constraint prevents duplicate processing.
+```
+
 ---
 
 ## URL State Architecture
@@ -859,6 +936,120 @@ export function useFilters() {
 6. Debounce search input (300ms) — don't flood history
 7. Shallow updates for tabs/modals (no server round-trip)
 8. Deep updates (shallow: false) for filters that affect data
+```
+
+---
+
+## Search Architecture
+
+### Strategy: PostgreSQL tsvector (MVP)
+
+No external service. Search lives in the same database.
+Sufficient for <100K records. Migrate to Meilisearch if needed.
+
+### What is searchable
+
+```
+Global search (/studio?q=dentour):
+  → projects:       name, slug, description
+  → entities:        label, description, entity_key
+  → specs:           content (markdown full text)
+  → tasks:           title, description
+  → clients:         name, company
+  → network members: name, specialty
+  → messages:        message content
+  → articles:        title, content
+```
+
+### Implementation
+
+**Each searchable table gets a `search_vector` column:**
+
+```sql
+-- Example: projects table
+ALTER TABLE projects
+  ADD COLUMN search_vector tsvector
+  GENERATED ALWAYS AS (
+    setweight(to_tsvector('english', coalesce(name, '')), 'A') ||
+    setweight(to_tsvector('english', coalesce(description, '')), 'B')
+  ) STORED;
+
+CREATE INDEX idx_projects_search ON projects USING GIN(search_vector);
+```
+
+Weight A = name/title (most important), B = description, C = content.
+
+**Search query pattern:**
+
+```sql
+SELECT id, name, ts_rank(search_vector, query) AS rank
+FROM projects, plainto_tsquery('english', 'dentour') query
+WHERE search_vector @@ query
+ORDER BY rank DESC
+LIMIT 20;
+```
+
+### Global Search API
+
+```
+GET /api/search?q=dentour&scope=all
+GET /api/search?q=dentour&scope=projects
+GET /api/search?q=dentour&scope=specs
+
+Response:
+{
+  results: [
+    { type: 'project', id: '...', title: 'Dentour Platform', rank: 0.95 },
+    { type: 'entity', id: '...', title: 'Patient', rank: 0.72 },
+    { type: 'spec', id: '...', title: 'auth/spec.md', rank: 0.61 }
+  ],
+  total: 12,
+  query: 'dentour'
+}
+```
+
+### UI: Command Palette
+
+```
+Cmd+K (Mac) / Ctrl+K (Windows) → opens search overlay
+
+  ┌─────────────────────────────────────────┐
+  │  Search...  dentour                     │
+  ├─────────────────────────────────────────┤
+  │  Dentour Platform              project  │
+  │  Patient                       entity   │
+  │  auth/spec.md                  spec     │
+  │  Setup Supabase                task     │
+  └─────────────────────────────────────────┘
+
+Each result is an Entity View (Inline level).
+Enter → navigates to that entity's URL.
+Debounce: 300ms (same as nuqs search).
+```
+
+### Multi-language search
+
+```
+Hebrew and Russian text: use 'simple' config instead of 'english':
+  to_tsvector('simple', content)
+
+Or: one search_vector per language,
+    detect language from content or user locale.
+
+MVP: 'simple' config for all — works for any language,
+     just no stemming (no "running" → "run" matching).
+```
+
+### Rules
+
+```
+1. Every new table with user-visible text gets search_vector
+2. search_vector is GENERATED ALWAYS — no manual sync needed
+3. GIN index on every search_vector column
+4. Global search returns max 20 results per type
+5. Results are Entity Views at Inline level
+6. Cmd+K available on every page in Studio
+7. Search respects RLS — users only find what they can access
 ```
 
 ---
