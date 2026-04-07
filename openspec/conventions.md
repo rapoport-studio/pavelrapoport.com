@@ -327,6 +327,84 @@ NEVER optimistic:
 Every mutation follows this template. No exceptions.
 Copy the pattern, change the types and endpoint.
 
+### Concurrent Editing
+
+What happens when two people edit the same entity at the same time.
+
+**Strategy: optimistic locking via `updated_at`.**
+
+```
+How it works:
+
+  1. User A opens entity at 10:00
+     → client stores: loaded_at = "2026-04-07T10:00:00Z"
+
+  2. User B opens same entity at 10:01
+     → client stores: loaded_at = "2026-04-07T10:01:00Z"
+
+  3. User B saves at 10:05
+     → API checks: updated_at in DB == loaded_at? Yes → save
+     → DB updated_at is now "2026-04-07T10:05:00Z"
+
+  4. User A saves at 10:07
+     → API checks: updated_at in DB == loaded_at?
+     → DB has 10:05, User A loaded at 10:00 → CONFLICT
+     → API returns 409 Conflict
+     → UI shows: "This entity was modified by someone else.
+        Review changes and try again."
+```
+
+**API implementation:**
+
+```typescript
+// PATCH /api/projects/:slug/entities/:id
+// Body includes: { ...patch, updated_at: "loaded_at value" }
+
+async function updateEntity(id: string, patch: EntityPatch) {
+  const { count } = await supabase
+    .from('entities')
+    .update({ ...patch, updated_at: new Date() })
+    .eq('id', id)
+    .eq('updated_at', patch.updated_at) // optimistic lock
+    .select()
+
+  if (count === 0) {
+    throw new ConflictError('ENTITY_MODIFIED',
+      'errors.entities.conflict')
+  }
+}
+```
+
+**UI conflict resolution:**
+
+```
+On 409 Conflict:
+  1. Fetch fresh entity from server
+  2. Show diff: "Changed by [name] at [time]"
+     - Fields they changed (highlighted)
+     - Fields you changed (highlighted)
+  3. Options:
+     → "Overwrite" — force save your version
+     → "Reload" — discard your changes, take theirs
+     → "Merge" — manual pick per field (future)
+```
+
+**Where this applies:**
+
+```
+ALWAYS check updated_at:
+  - Entities (core data, multiple editors)
+  - Specs (markdown content, easy to conflict)
+  - Projects (settings, domain graph)
+  - Creative assets (status changes)
+
+DON'T check (last-write-wins is fine):
+  - Messages (append-only, no editing)
+  - Activity log (append-only)
+  - Canvas sessions (single user per session)
+  - Tasks (usually one assignee)
+```
+
 ### Strict React Rules
 
 **Banned patterns:**
