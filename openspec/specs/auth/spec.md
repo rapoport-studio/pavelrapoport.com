@@ -84,10 +84,35 @@ Seven layers of protection, from edge to database.
 
 First wall — before the request reaches the application.
 - DDoS protection (Cloudflare default)
-- Rate limiting by IP (login: max 5 attempts/min)
 - WAF rules — block SQL injection, XSS in headers
 - Bot protection — separate scripts from real users
 - Geo-blocking (if needed)
+
+**Rate limits per endpoint category:**
+
+```
+Auth endpoints:
+  POST /auth/login         → 5 req/min per IP
+  POST /auth/otp           → 3 req/min per IP
+  POST /auth/reset         → 3 req/min per IP
+
+AI endpoints:
+  POST /canvas/sessions    → 5 sessions/hour per IP
+  POST /canvas/*/message   → 30 req/min per session
+  POST /muse/*             → 10 req/min per user (authenticated)
+
+Webhook receivers:
+  POST /webhooks/*         → 100 req/min per source IP
+
+API (authenticated):
+  GET  /api/*              → 120 req/min per user
+  POST /api/*              → 60 req/min per user
+  File uploads             → 10 req/min per user, 50MB max
+
+Public:
+  GET  /* (pages)          → no limit (Cloudflare cache)
+  GET  /s/* (shared maps)  → 60 req/min per IP
+```
 
 ### Layer 2: Transport (HTTPS + Headers)
 
@@ -129,6 +154,22 @@ doesn't leak.
   DELETE — never `FOR ALL`
 - Tested with anon/user/admin roles in CI
 
+**Anon role default: zero access.**
+```sql
+-- Every new table starts locked. No implicit SELECT.
+-- Anon can only access explicitly whitelisted tables:
+
+-- Public read (anon allowed):
+--   blog_posts (WHERE status = 'published')
+--   case_studies (WHERE status = 'published')
+--   pages (WHERE status = 'published')
+--   canvas_sessions (INSERT only — start new session)
+
+-- Everything else: authenticated only.
+-- CI test: query every table as anon → expect 0 rows
+--   unless table is in the whitelist above.
+```
+
 ### Layer 6: Secrets Management
 
 - `anon_key` — safe on client, RLS protects
@@ -147,6 +188,29 @@ doesn't leak.
 - User files isolated by user_id folder structure
 - File type validation — reject unexpected formats
 - Size limits per upload
+
+**Malware scanning:**
+```
+Upload flow:
+  1. Client uploads to Supabase Storage (temp bucket)
+  2. Database trigger fires on INSERT to storage.objects
+  3. Edge function picks up file → scans via ClamAV
+     (self-hosted on Railway, or Cloudflare R2 scanner)
+  4. Clean → move to permanent bucket, mark status = 'clean'
+  5. Infected → delete file, log event, notify admin
+  6. Timeout (>30s) → quarantine, manual review
+
+Allowed file types (whitelist):
+  Images: jpg, jpeg, png, gif, webp, svg
+  Documents: pdf, md, txt
+  Design: fig, sketch (pass-through, no scan)
+  Max size: 50MB per file, 200MB per session
+
+Blocked by extension (before upload reaches storage):
+  Executables: exe, bat, sh, cmd, ps1, msi
+  Archives: zip, rar, tar.gz (unless explicitly enabled per project)
+  Scripts: js, ts, py, rb, php
+```
 
 ### Risk Matrix
 
@@ -440,7 +504,7 @@ The system SHALL support two base roles at launch.
 
 ### Requirement: Access by Domain Role
 
-The system SHALL determine visibility based on domain role.
+The system SHALL grant access based on the user's domain role.
 
 #### Scenario: Client access
 - **GIVEN** user has client profile
@@ -489,7 +553,7 @@ The system SHALL maintain a single session across all subdomains.
 
 ### Requirement: Login Flow
 
-The system SHALL redirect unauthenticated users to login and return them after authentication.
+The system SHALL redirect unauthenticated users to login and restore their destination after authentication.
 
 #### Scenario: Login from protected page
 - **WHEN** unauthenticated user hits protected route
@@ -520,7 +584,7 @@ The system SHALL destroy sessions across all subdomains on logout.
 
 ### Requirement: Email Flows
 
-The system SHALL handle transactional auth emails via Supabase.
+The system SHALL support magic link, password reset, and email change flows.
 
 #### Scenario: Magic link
 - **WHEN** user requests magic link
@@ -538,7 +602,7 @@ The system SHALL handle transactional auth emails via Supabase.
 
 ### Requirement: Route Protection
 
-The system SHALL enforce route-level access control via middleware.
+The system SHALL enforce route-level access control based on user role.
 
 #### Scenario: Admin-only route
 - **WHEN** non-admin hits /studio/finance → denied
@@ -553,7 +617,7 @@ The system SHALL enforce route-level access control via middleware.
 
 ### Requirement: Row-Level Security
 
-The system SHALL use Supabase RLS policies on every public table.
+The system SHALL enforce row-level security on every table in the public schema.
 
 #### Scenario: Data isolation
 - **WHEN** user queries any table
@@ -563,22 +627,41 @@ The system SHALL use Supabase RLS policies on every public table.
 - **GIVEN** a middleware bug
 - **THEN** RLS still blocks unauthorized access
 
+#### Scenario: Self-role modification blocked
+- **GIVEN** a user with org_role `member`
+- **WHEN** they attempt to UPDATE their own org_role to `admin`
+- **THEN** RLS policy blocks the update
+- **AND** only `owner` role can modify other users' org_roles
+- **AND** the attempt is logged to audit trail
+
 ---
 
 ### Requirement: Session Expiry
 
-The system SHALL handle expired sessions gracefully.
+The system SHALL handle session expiration and revocation gracefully.
 
 #### Scenario: Active session expires
 - **WHEN** session expires during use
 - **THEN** non-blocking notification: "Session expired"
 - **AND** re-login without losing page context
 
+#### Scenario: Session revocation (suspected compromise)
+- **WHEN** Pavel suspects a stolen session
+- **THEN** he calls `revokeAllSessions(userId)` from Studio
+- **AND** all active sessions for that user are invalidated
+- **AND** user must re-authenticate on next request
+- **AND** event logged to audit trail
+
+#### Scenario: Self-service session management
+- **WHEN** any user views their security settings
+- **THEN** they see active sessions (device, IP, last active)
+- **AND** can revoke individual sessions
+
 ---
 
 ### Requirement: Audit Trail
 
-The system SHALL log all security-relevant events.
+The system SHALL log all authentication and authorization events.
 
 #### Scenario: Security event logging
 - **WHEN** any auth event occurs (login, logout, role change,
@@ -612,6 +695,9 @@ All auth logic lives here. Apps import, never implement.
 - `validateInput(schema, data)` → zod validation
 - `sanitizeOutput(data, role)` → strip sensitive fields
 - `auditLog(action, userId, detail)` → security event log
+- `revokeAllSessions(userId)` → invalidate all user sessions
+- `revokeSession(sessionId)` → invalidate single session
+- `listActiveSessions(userId)` → device, IP, last active
 
 **Config:**
 - `AUTH_ROUTES` → public / auth-required / admin-only map

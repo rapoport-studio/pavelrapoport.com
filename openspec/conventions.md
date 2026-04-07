@@ -713,6 +713,448 @@ NEVER realtime:
   - Creative assets (uploaded, reviewed on refresh)
 ```
 
+### Data Sync Layer
+
+**The full data flow from UI to database and back.**
+
+This is the "прошивка" (firmware) between the client and Supabase.
+Every data operation passes through the same pipeline — no shortcuts.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  UI Component                                           │
+│  (renders data, handles user actions)                   │
+└───────────────┬──────────────────────▲──────────────────┘
+        mutation │                      │ data
+                 ▼                      │
+┌─────────────────────────────────────────────────────────┐
+│  TanStack Query                                         │
+│  ┌──────────────────┐  ┌─────────────────────────────┐  │
+│  │ useMutation()    │  │ useQuery()                  │  │
+│  │ • optimistic     │  │ • staleTime per domain      │  │
+│  │   update cache   │  │ • gcTime: 10min             │  │
+│  │ • call API       │  │ • auto refetch on focus     │  │
+│  │ • rollback on    │  │ • auto refetch on reconnect │  │
+│  │   error          │  │ • retry: 3 attempts         │  │
+│  └────────┬─────────┘  └──────────▲──────────────────┘  │
+│           │                       │ invalidateQueries()  │
+│           │              ┌────────┴─────────────┐       │
+│           │              │ Realtime Listener     │       │
+│           │              │ useRealtimeInvalidation│      │
+│           │              │ (Supabase WS → cache) │       │
+│           │              └────────▲──────────────┘       │
+└───────────┼───────────────────────┼─────────────────────┘
+            │ HTTP request          │ WebSocket
+            ▼                       │
+┌─────────────────────────────────────────────────────────┐
+│  NestJS API (Railway)                                   │
+│  ┌──────────────────┐  ┌─────────────────────────────┐  │
+│  │ Controller       │  │ Redis Cache                 │  │
+│  │ • validate input │  │ • check cache first         │  │
+│  │ • auth check     │  │ • set on DB read            │  │
+│  │ • call service   │  │ • delete on write           │  │
+│  └────────┬─────────┘  └──────────▲──────────────────┘  │
+│           │                       │                      │
+│           ▼                       │                      │
+│  ┌────────────────────────────────┴──────────────────┐  │
+│  │ Service Layer                                     │  │
+│  │ • business logic                                  │  │
+│  │ • write → Supabase + delete Redis key             │  │
+│  │ • read → Redis hit? return : query Supabase       │  │
+│  └────────┬──────────────────────────────────────────┘  │
+└───────────┼─────────────────────────────────────────────┘
+            │ SQL query / write
+            ▼
+┌─────────────────────────────────────────────────────────┐
+│  Supabase PostgreSQL                                    │
+│  • Source of truth (always correct)                     │
+│  • RLS enforced on every query                          │
+│  • ON INSERT/UPDATE/DELETE → Realtime broadcast         │
+│  • Trigger fires → WS event → client receives           │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Read flow (GET):**
+
+```
+1. Component mounts → useQuery() checks TanStack cache
+2. Cache hit + fresh? → render immediately (no network)
+3. Cache stale or miss? → fetch from API
+4. API checks Redis cache → hit? return cached response
+5. Redis miss? → query Supabase (with RLS) → store in Redis → return
+6. TanStack stores response in client cache → render
+```
+
+**Write flow (POST/PATCH/DELETE):**
+
+```
+1. User action → useMutation() fires
+2. Optimistic update: TanStack cache updated immediately (UI feels instant)
+3. HTTP request to API
+4. API validates → Service writes to Supabase
+5. Service deletes related Redis keys
+6. Supabase trigger fires → Realtime WS event
+7. Client receives WS → invalidateQueries() → refetch
+8. If API error: TanStack rolls back optimistic update
+```
+
+**Why this matters:**
+
+```
+Without this layer:
+  User clicks "Save" → waits 500ms → page refreshes → data appears
+  Feels slow. Other tabs don't update. Stale data everywhere.
+
+With this layer:
+  User clicks "Save" → data appears instantly (optimistic)
+  → Redis caches for other requests
+  → Realtime pushes to all open tabs/users
+  → Everything stays in sync automatically
+```
+
+**Implementation per domain:**
+
+```typescript
+// packages/api/src/lib/data-sync.ts — server side
+
+import { CacheManager } from '@nestjs/cache-manager';
+
+export class DataSyncService {
+  constructor(
+    private cache: CacheManager,
+    private supabase: SupabaseClient,
+  ) {}
+
+  // Read: Redis → Supabase fallback
+  async findCached<T>(
+    key: string,
+    ttl: number,
+    fetcher: () => Promise<T>
+  ): Promise<T> {
+    const cached = await this.cache.get<T>(key);
+    if (cached) return cached;
+    const data = await fetcher();
+    await this.cache.set(key, data, ttl);
+    return data;
+  }
+
+  // Write: Supabase + invalidate Redis
+  async writeAndInvalidate<T>(
+    writer: () => Promise<T>,
+    keysToInvalidate: string[]
+  ): Promise<T> {
+    const result = await writer();
+    await Promise.all(
+      keysToInvalidate.map(k => this.cache.del(k))
+    );
+    return result;
+    // Supabase Realtime handles client-side invalidation
+  }
+}
+
+// Usage in service:
+async updateProject(id: string, data: UpdateProjectDto) {
+  return this.dataSync.writeAndInvalidate(
+    () => this.supabase.from('projects').update(data).eq('id', id),
+    [
+      `projects:project:${id}`,
+      `projects:project:list:${data.organization_id}`,
+    ]
+  );
+}
+```
+
+```typescript
+// packages/shared/src/hooks/use-synced-query.ts — client side
+
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { supabase } from '@rapoport/db';
+
+type SyncStrategy = 'invalidate' | 'patch';
+
+/**
+ * useSyncedQuery — the standard hook for all data fetching.
+ * Combines TanStack Query + Supabase Realtime in one call.
+ * This is the "прошивка" — every component uses this, never raw useQuery.
+ *
+ * Two sync strategies:
+ *
+ * 'invalidate' (default) — Realtime fires → cache invalidated → refetch via API
+ *   Use for: complex entities with joins, computed fields, aggregations
+ *   Examples: projects (with entity count), dashboard stats, cost rollups
+ *   Trade-off: extra HTTP request, but data is always 100% correct
+ *
+ * 'patch' — Realtime sends new row → setQueryData() directly, no refetch
+ *   Use for: flat rows, no joins, no computed fields, high-frequency updates
+ *   Examples: messages, canvas_sessions, task status, activity_log
+ *   Trade-off: zero extra requests, but data must be usable as-is from DB
+ */
+export function useSyncedQuery<T>(options: {
+  queryKey: readonly unknown[];
+  queryFn: () => Promise<T>;
+  table: string;
+  staleTime?: number;
+  realtimeFilter?: string;
+  strategy?: SyncStrategy;        // default: 'invalidate'
+  patchFn?: (old: T, payload: any) => T;  // required if strategy = 'patch'
+}) {
+  const queryClient = useQueryClient();
+  const strategy = options.strategy ?? 'invalidate';
+
+  const query = useQuery({
+    queryKey: options.queryKey,
+    queryFn: options.queryFn,
+    staleTime: options.staleTime ?? 30_000,
+  });
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(`${options.table}-${options.queryKey.join('-')}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: options.table,
+          ...(options.realtimeFilter && { filter: options.realtimeFilter }),
+        },
+        (payload) => {
+          if (strategy === 'patch' && options.patchFn) {
+            // Strategy B: apply Realtime payload directly to cache
+            queryClient.setQueryData(
+              options.queryKey,
+              (old: T) => options.patchFn!(old, payload)
+            );
+          } else {
+            // Strategy A: invalidate → TanStack refetches via API
+            queryClient.invalidateQueries({ queryKey: options.queryKey });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [options.table, options.realtimeFilter, strategy]);
+
+  return query;
+}
+```
+
+**Strategy A: invalidate (default) — для сложных данных:**
+
+```typescript
+// Projects list has computed fields (entity_count, last_activity)
+// → must go through API to get correct data
+function ProjectList({ orgId }: { orgId: string }) {
+  const { data, isLoading } = useSyncedQuery({
+    queryKey: ['listProjects', orgId],
+    queryFn: () => api.listProjects({ orgId }),
+    table: 'projects',
+    realtimeFilter: `organization_id=eq.${orgId}`,
+    strategy: 'invalidate',  // default, can omit
+  });
+
+  if (isLoading) return <ProjectListSkeleton />;
+  return <List data={data} />;
+}
+
+// Flow: Realtime event → invalidateQueries → refetch from API → Redis → DB
+// Extra HTTP request, but data includes joins + computed fields
+```
+
+**Strategy B: patch — для плоских данных с высокой частотой:**
+
+```typescript
+// Chat messages are flat rows, no joins, no computed fields
+// → Realtime payload is usable as-is
+function ChatMessages({ sessionId }: { sessionId: string }) {
+  const { data, isLoading } = useSyncedQuery({
+    queryKey: ['messages', sessionId],
+    queryFn: () => api.listMessages({ sessionId }),
+    table: 'messages',
+    realtimeFilter: `session_id=eq.${sessionId}`,
+    strategy: 'patch',
+    patchFn: (old, payload) => {
+      if (!old) return old;
+      const messages = [...old.data];
+      if (payload.eventType === 'INSERT') {
+        messages.push(payload.new);
+      } else if (payload.eventType === 'UPDATE') {
+        const idx = messages.findIndex(m => m.id === payload.new.id);
+        if (idx >= 0) messages[idx] = payload.new;
+      } else if (payload.eventType === 'DELETE') {
+        return { ...old, data: messages.filter(m => m.id !== payload.old.id) };
+      }
+      return { ...old, data: messages };
+    },
+  });
+
+  return <MessageList messages={data?.data} />;
+}
+
+// Flow: Realtime event WITH row data → setQueryData() → UI updates
+// Zero extra HTTP requests. Instant.
+```
+
+**Decision table — which strategy per domain:**
+
+The strategy is NOT chosen per component. It's a **centralized config**.
+`useSyncedQuery` reads from this map automatically.
+
+```typescript
+// packages/shared/src/config/sync-strategy.ts
+
+export type SyncStrategy = 'patch' | 'invalidate';
+
+/**
+ * Central registry: which Supabase table uses which sync strategy.
+ * One place to change. Every useSyncedQuery reads from here.
+ *
+ * 'patch'      → Realtime payload → setQueryData (no HTTP request)
+ * 'invalidate' → Realtime event → invalidateQueries → refetch via API
+ */
+export const SYNC_STRATEGY: Record<string, SyncStrategy> = {
+  // --- patch: flat rows, high frequency, no computed fields ---
+  messages:           'patch',
+  canvas_sessions:    'patch',
+  tasks:              'patch',
+  entities:           'patch',
+  relationships:      'patch',
+  activity_log:       'patch',
+  notifications:      'patch',
+
+  // --- invalidate: joins, computed fields, aggregations ---
+  projects:           'invalidate',
+  clients:            'invalidate',
+  invoices:           'invalidate',
+  creative_assets:    'invalidate',
+  specs:              'invalidate',
+  changes:            'invalidate',
+  organizations:      'invalidate',
+};
+
+// Default for unlisted tables:
+export const DEFAULT_STRATEGY: SyncStrategy = 'invalidate';
+```
+
+**useSyncedQuery reads from config — component doesn't choose:**
+
+```typescript
+// Updated useSyncedQuery — strategy is automatic
+
+import { SYNC_STRATEGY, DEFAULT_STRATEGY } from '../config/sync-strategy';
+
+export function useSyncedQuery<T>(options: {
+  queryKey: readonly unknown[];
+  queryFn: () => Promise<T>;
+  table: string;
+  staleTime?: number;
+  realtimeFilter?: string;
+  patchFn?: (old: T, payload: any) => T;
+  // strategy is NOT passed in — read from config
+}) {
+  const strategy = SYNC_STRATEGY[options.table] ?? DEFAULT_STRATEGY;
+
+  // ... rest of the hook uses `strategy` from config
+}
+
+// Component code is clean — no strategy choice needed:
+function ChatMessages({ sessionId }: { sessionId: string }) {
+  const { data } = useSyncedQuery({
+    queryKey: ['messages', sessionId],
+    queryFn: () => api.listMessages({ sessionId }),
+    table: 'messages',                              // ← config says 'patch'
+    realtimeFilter: `session_id=eq.${sessionId}`,
+    patchFn: patchMessageList,                      // ← required because config says 'patch'
+  });
+  return <MessageList messages={data} />;
+}
+
+function ProjectList({ orgId }: { orgId: string }) {
+  const { data } = useSyncedQuery({
+    queryKey: ['listProjects', orgId],
+    queryFn: () => api.listProjects({ orgId }),
+    table: 'projects',                              // ← config says 'invalidate'
+    realtimeFilter: `organization_id=eq.${orgId}`,
+    // no patchFn needed — invalidate refetches via API
+  });
+  return <List data={data} />;
+}
+```
+
+**Switching strategy = one line change in config, zero component changes.**
+
+```typescript
+// Tomorrow we add server-side computed field to tasks:
+// Just change the config:
+tasks: 'invalidate',  // was 'patch'
+// Every component using table: 'tasks' now refetches instead of patching.
+// No component code touched.
+```
+
+**When to choose 'patch' vs 'invalidate':**
+
+```
+Use 'patch' when ALL of these are true:
+  ✅ Row is flat (no JOINs in the API response)
+  ✅ No computed/derived fields (everything comes from the table)
+  ✅ High frequency updates (chat, status, realtime canvas)
+  ✅ Supabase Realtime payload = what the UI needs
+
+Use 'invalidate' when ANY of these is true:
+  ❌ API response includes JOINs (entity + relationships)
+  ❌ API response has computed fields (counts, aggregations)
+  ❌ Data passes through server-side transformations
+  ❌ Low frequency (project settings, specs) — extra request is fine
+```
+
+**Generic patchFn helpers (reusable):**
+
+```typescript
+// packages/shared/src/lib/patch-helpers.ts
+
+/** Standard list patcher — works for any flat entity with `id` field */
+export function patchList<T extends { id: string }>(
+  old: { data: T[] } | undefined,
+  payload: RealtimePayload<T>
+): { data: T[] } | undefined {
+  if (!old) return old;
+  const items = [...old.data];
+
+  switch (payload.eventType) {
+    case 'INSERT':
+      return { ...old, data: [...items, payload.new] };
+    case 'UPDATE': {
+      const idx = items.findIndex(i => i.id === payload.new.id);
+      if (idx >= 0) items[idx] = payload.new;
+      return { ...old, data: items };
+    }
+    case 'DELETE':
+      return { ...old, data: items.filter(i => i.id !== payload.old.id) };
+    default:
+      return old;
+  }
+}
+
+// Usage — most 'patch' tables just use the generic helper:
+useSyncedQuery({
+  table: 'messages',
+  patchFn: patchList,  // ← generic, handles INSERT/UPDATE/DELETE
+  // ...
+});
+```
+
+**Rule: every data-fetching component uses `useSyncedQuery`, never raw `useQuery`.**
+This ensures all data is automatically synced via Realtime without
+each developer having to remember to wire up subscriptions.
+
+**Rule: strategy lives in `SYNC_STRATEGY` config, never in components.**
+Components provide `table` and optional `patchFn`. The config decides the rest.
+
+**Rule: if `patchFn` gets complex (>15 lines), switch the table to 'invalidate'.**
+Simple patching = `patchList` generic. Complex = just refetch.
+
 ### Webhook Processing
 
 **Problem:** Webhooks are fire-and-forget. If our API is slow
@@ -788,6 +1230,199 @@ Future:  Railway worker with proper queue (BullMQ/pg-boss)
 5. Dead webhooks (3 failures) → Pavel notified via Resend.
 6. Raw payload stored forever (audit trail).
 7. delivery_id UNIQUE constraint prevents duplicate processing.
+```
+
+### API Documentation & Testing
+
+**Swagger UI is the primary API documentation and testing tool.**
+
+NestJS generates interactive Swagger UI via `@nestjs/swagger`.
+
+```
+Endpoints:
+  api.pavelrapoport.com/docs          → Swagger UI (interactive)
+  api.pavelrapoport.com/openapi.json  → machine-readable spec
+
+What Swagger UI provides:
+  ✅ Full endpoint documentation (auto-generated from code)
+  ✅ "Try it out" — test any endpoint in the browser
+  ✅ Authorization — Bearer token via "Authorize" button
+  ✅ Request/response validation
+  ✅ Schema viewer for all types
+```
+
+**NestJS setup:**
+
+```typescript
+// services/api/src/main.ts
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+
+const config = new DocumentBuilder()
+  .setTitle('Pavel Rapoport Platform API')
+  .setVersion('0.1.0')
+  .setDescription('AI Development Studio API')
+  .addBearerAuth()           // ← "Authorize" button in Swagger UI
+  .addTag('auth')
+  .addTag('projects')
+  .addTag('canvas')
+  .addTag('clients')
+  .addTag('organizations')
+  .build();
+
+const document = SwaggerModule.createDocument(app, config);
+SwaggerModule.setup('docs', app, document);
+
+// Also serve raw spec
+app.getHttpAdapter().get('/openapi.json', (req, res) => {
+  res.json(document);
+});
+```
+
+**Authorization in Swagger UI:**
+
+```
+1. Get JWT token from Supabase Auth (login via app or cURL)
+2. Click "Authorize" in Swagger UI
+3. Paste: Bearer <token>
+4. All subsequent requests include the token
+5. Can test as any user role (admin, client, network)
+```
+
+**Validation — three levels:**
+
+```
+Level 1: Input (NestJS + class-validator)
+  Every DTO has decorators → Swagger shows requirements
+  Invalid request → 400 with field-level errors
+
+Level 2: Client-side (Zod schemas from codegen)
+  Forms validate BEFORE sending to API
+  Same types as API expects
+
+Level 3: CI (spec compliance)
+  Test: actual API response === openapi.yaml schema
+  Divergence → build fails
+```
+
+**Swagger vs Postman — decision:**
+
+```
+Swagger UI: primary tool for daily work
+  ✅ Always in sync with code (auto-generated)
+  ✅ No collection maintenance
+  ✅ Auth built-in
+  ✅ Validation built-in
+
+Postman: optional, for complex E2E chains only
+  ✅ Multi-step scenarios with variables
+  ✅ Shareable collections
+  ❌ Must sync manually with API
+  ❌ Extra tool to maintain
+
+Import: openapi.json → Postman in one click if needed.
+```
+
+### OpenSpec → OpenAPI Generation
+
+**There is no automated parser from OpenSpec to Swagger.**
+OpenSpec describes business requirements. OpenAPI describes HTTP
+interfaces. These are different abstraction levels.
+
+```
+OpenSpec (spec.md):
+  "The system SHALL store client profiles with contact information"
+  "WHEN Pavel accepts the client THEN status changes to active"
+  → WHAT the system does (requirements)
+
+OpenAPI (openapi.yaml):
+  POST /api/clients { name, email, company }
+  → 201 { id, status: "lead" }
+  → HOW the API looks (contract)
+```
+
+**The bridge is AI-assisted, not automated:**
+
+```
+OpenSpec spec.md (requirements + scenarios + entities)
+  ↓ AI-assisted (Claude Code / Muse Architect)
+openapi.yaml (OpenAPI 3.1)
+  ↓ @hey-api/openapi-ts (automated codegen)
+TypeScript types + TanStack Query hooks + Zod schemas
+  ↓ NestJS implements
+Swagger UI at api.pavelrapoport.com/docs
+```
+
+**Prompt template for Muse Architect:**
+
+```
+Given this OpenSpec domain spec: {spec.md content}
+
+Generate openapi.yaml paths and schemas for this domain.
+
+Rules:
+  - OpenAPI 3.1 format
+  - All responses: { data: T } or { data: T[], cursor, hasMore }
+  - Error responses: { error: { code, message, details? } }
+  - Pagination: cursor-based (cursor query param)
+  - Auth: Bearer token (Supabase JWT)
+  - Tags: one tag per domain
+  - operationId: verbNoun format (listClients, createProject)
+  - Include request validation (required fields, formats)
+  - Include example values
+
+Output only the YAML for paths + schemas of this domain.
+I will merge it into the main openapi.yaml.
+```
+
+**Workflow for adding a new domain to the API:**
+
+```
+Step 1: Write/update OpenSpec spec.md for the domain
+Step 2: Ask Muse Architect to generate OpenAPI paths
+Step 3: Review generated YAML, adjust if needed
+Step 4: Merge into packages/api/openapi.yaml
+Step 5: pnpm openapi:generate → types, hooks, schemas
+Step 6: Implement NestJS controllers matching the spec
+Step 7: Swagger UI auto-updates at /docs
+Step 8: CI verifies implementation matches spec
+```
+
+**Per-domain OpenAPI organization:**
+
+```yaml
+# packages/api/openapi.yaml — single file, organized by tags
+
+tags:
+  - name: auth
+    description: Authentication & sessions
+  - name: canvas
+    description: Public AI chat sessions
+  - name: clients
+    description: Client management & leads
+  - name: projects
+    description: Project lifecycle
+  - name: organizations
+    description: Multi-tenant org structure
+  - name: tasks
+    description: Task management
+  - name: finance
+    description: Invoices & payments
+
+# paths grouped by domain:
+paths:
+  # --- auth ---
+  /api/auth/login: ...
+  /api/auth/logout: ...
+
+  # --- canvas ---
+  /api/canvas/sessions: ...
+  /api/canvas/sessions/{id}/message: ...
+
+  # --- clients ---
+  /api/clients: ...
+  /api/clients/{id}: ...
+
+  # etc.
 ```
 
 ---
@@ -2026,13 +2661,14 @@ Cloudflare
 
 Railway
   ├── API services  → NestJS backends
+  ├── Redis         → server-side cache + sessions + queues
   ├── Workers       → background jobs, queues
   └── Cron          → scheduled tasks
 
 Supabase
-  ├── PostgreSQL    → primary database
+  ├── PostgreSQL    → primary database (source of truth)
   ├── Auth          → authentication
-  ├── Realtime      → WebSocket subscriptions
+  ├── Realtime      → WebSocket subscriptions → cache invalidation
   └── Storage       → file uploads
 ```
 
@@ -2100,8 +2736,10 @@ on GET requests, DDoS protection, WAF rules.
 
 ### Caching Strategy
 
+**Four cache layers, top to bottom:**
+
 ```
-Cloudflare caches (edge):
+Layer 1: Cloudflare Edge (CDN)
   Static assets:    → Cache-Control: public, max-age=31536000, immutable
                       (CSS, JS, images, fonts — hashed filenames)
   HTML pages:       → Cache-Control: no-cache
@@ -2110,13 +2748,80 @@ Cloudflare caches (edge):
                       (cacheable reads — projects list, specs)
   API mutation:     → no-store (POST, PATCH, DELETE)
 
-TanStack Query caches (client):
+Layer 2: Redis (Railway, server-side)
+  API response cache for expensive queries:
+    Projects list with entity counts     → TTL 60s
+    Dashboard aggregations               → TTL 30s
+    Client fit score computation         → TTL 5min
+    Canvas session domain graph          → TTL 10min
+    Cost rollups (per project, per month) → TTL 5min
+
+  Session store:
+    Supabase JWT validation cache        → TTL matches JWT expiry
+    Rate limit counters                  → TTL per window (1min, 1hr)
+
+  Background job queue:
+    BullMQ backed by Redis (replaces cron polling in post-MVP)
+    Webhook processing, email sends, AI cost aggregation
+
+Layer 3: TanStack Query (client-side, in-memory)
   staleTime: 30s    → default for dynamic data
   staleTime: 5min   → static reference data (orgs, settings)
+  staleTime: 0      → realtime data (chat messages, canvas)
   gcTime: 10min     → garbage collect unused cache
 
-Supabase Realtime invalidates TanStack Query cache
-when server data changes → always fresh.
+Layer 4: Supabase Realtime → invalidates Layer 3
+  PostgreSQL change → Realtime WS → client callback
+  → queryClient.invalidateQueries() → refetch from API
+  → API checks Redis (Layer 2) → if miss, queries PostgreSQL
+```
+
+**Redis setup (Railway):**
+
+```
+Service:     Railway Redis plugin (managed)
+             OR self-hosted Redis 7+ on Railway
+Connection:  REDIS_URL environment variable
+Library:     ioredis (NestJS)
+Size:        Start with 25MB (free tier), scale as needed
+
+NestJS integration:
+  @nestjs/cache-manager + cache-manager-ioredis-yet
+
+  // Cache decorator on controller methods:
+  @UseInterceptors(CacheInterceptor)
+  @CacheTTL(60)
+  @Get('projects')
+  async listProjects() { ... }
+
+  // Manual cache for complex logic:
+  const cached = await this.cacheManager.get(`projects:${orgId}`);
+  if (cached) return cached;
+  const data = await this.projectsService.findAll(orgId);
+  await this.cacheManager.set(`projects:${orgId}`, data, 60);
+  return data;
+```
+
+**Cache invalidation rules:**
+
+```
+When data changes (POST/PATCH/DELETE):
+  1. Write to Supabase (source of truth)
+  2. Delete related Redis keys (server-side)
+  3. Supabase Realtime fires WS event
+  4. Client receives event → invalidateQueries()
+  5. Client refetches → API serves from Redis or DB
+
+Key naming convention:
+  {domain}:{entity}:{id}         → single entity
+  {domain}:{entity}:list:{orgId} → list for org
+  {domain}:aggregation:{scope}   → computed data
+
+Examples:
+  projects:project:abc-123
+  projects:project:list:org-456
+  finance:costs:monthly:2026-04
+  canvas:session:xyz-789:graph
 ```
 
 ### Builds
@@ -2344,3 +3049,688 @@ URL reflects scope:
 All apps share packages but deploy independently.
 All projects share Supabase but isolate via RLS.
 All domains go through Cloudflare but route to different services.
+
+---
+
+## Data Modeling
+
+### JSONB vs Normalized Tables (decision guide)
+
+```
+Use JSONB when:
+  - Schema varies per row (entity visual_identity, voice, behavior)
+  - Rarely queried by individual fields
+  - Read-heavy, written as a whole blob
+  - Example: domain_graph, settings, tasks[]
+
+Use normalized tables when:
+  - You need foreign keys or JOINs
+  - You filter/sort/aggregate by the field
+  - Multiple entities reference the same value
+  - Example: entities, relationships, invoices
+
+Hybrid (preferred):
+  - Core fields in columns (status, created_at, user_id)
+  - Flexible data in JSONB (metadata, preferences, config)
+  - GIN index on JSONB only if you query inside it:
+    CREATE INDEX idx_entities_visual ON entities
+      USING GIN (visual_identity);
+```
+
+### Pagination
+
+Always cursor-based. Never offset-based (offset is O(n) at scale).
+
+```typescript
+// API contract
+interface PaginatedResponse<T> {
+  data: T[];
+  cursor: string | null;  // null = last page
+  hasMore: boolean;
+}
+
+// Query pattern
+const query = supabase
+  .from('entities')
+  .select('*')
+  .order('created_at', { ascending: false })
+  .limit(pageSize + 1);  // +1 to detect hasMore
+
+if (cursor) {
+  query.lt('created_at', cursor);
+}
+
+// Client: TanStack Query useInfiniteQuery
+```
+
+Default page size: 25. Max: 100. Client can request via `?limit=50`.
+
+### API Versioning
+
+```
+No /v1/ prefix for MVP.
+
+When breaking changes are needed (post-MVP):
+  Option A: /v2/ prefix for new version
+  Option B: header Accept-Version: 2
+  Decision: defer until first breaking change
+
+Current: all routes are unversioned.
+  /api/projects/:slug
+  /api/canvas/sessions/:id
+
+Versioning applies to external-facing API only.
+Internal app→API calls are always latest.
+```
+
+---
+
+## Performance
+
+### Bundle Optimization
+
+```
+Heavy libraries — dynamic import only:
+
+React Flow (domain map):
+  const DomainMap = dynamic(() => import('@/components/DomainMap'), {
+    ssr: false,
+    loading: () => <MapSkeleton />
+  });
+
+Code editor (specs tab):
+  const SpecEditor = dynamic(() => import('@/components/SpecEditor'), {
+    ssr: false
+  });
+
+Chart libraries (costs page):
+  const CostChart = dynamic(() => import('@/components/CostChart'), {
+    ssr: false
+  });
+
+Rule: if a library is >50KB gzipped and used on <50% of pages,
+it MUST be dynamically imported.
+
+Measure: `next build` → check .next/analyze (next-bundle-analyzer)
+Target: initial JS bundle < 150KB gzipped
+```
+
+### Image Optimization
+
+```
+All images through Next.js <Image> component. No raw <img>.
+
+Sources:
+  Supabase Storage → served via Cloudflare CDN
+  Static assets → /public, optimized at build time
+
+Formats: WebP preferred, AVIF for hero images
+Sizes: srcSet with 640, 750, 1080, 1200, 1920
+Lazy loading: default for below-fold images
+Priority: hero image, above-fold case study cards
+
+Avatar images: 128x128, WebP, cached 1 year
+Domain map thumbnails: 400x300, generated server-side (satori or puppeteer)
+OG images: 1200x630, auto-generated per page (satori)
+```
+
+### N+1 Query Prevention
+
+```
+Rule: never fetch related data in a loop.
+
+BAD:
+  const projects = await getProjects();
+  for (const p of projects) {
+    p.entities = await getEntities(p.id);  // N+1!
+  }
+
+GOOD:
+  const projects = await getProjects();
+  const ids = projects.map(p => p.id);
+  const entities = await getEntitiesByProjectIds(ids);
+  // then merge client-side
+
+BETTER (Supabase):
+  const { data } = await supabase
+    .from('projects')
+    .select('*, entities(*)');  // single query, JOIN
+
+Rule for TanStack Query:
+  Use select() to join at database level.
+  Use queryClient.prefetchQuery() for predictable navigations.
+  Never useQuery() inside .map().
+```
+
+### RLS Index Strategy
+
+```
+Every column referenced in an RLS policy MUST have an index.
+Without index: full table scan on every query → 100x slower.
+
+Required indexes (create with every RLS policy):
+  CREATE INDEX idx_{table}_user_id ON {table}(user_id);
+  CREATE INDEX idx_{table}_org_id ON {table}(organization_id);
+  CREATE INDEX idx_{table}_project_id ON {table}(project_id);
+
+Composite for common queries:
+  CREATE INDEX idx_entities_project_key
+    ON entities(project_id, entity_key);
+
+Monitor: pg_stat_user_tables → seq_scan count.
+If seq_scan > 1000 on any table, investigate missing index.
+```
+
+---
+
+## Realtime
+
+### Subscription Limits
+
+```
+Supabase Realtime limits (free/pro tier):
+  Max concurrent connections: 200 (pro) / 50 (free)
+  Max channels per connection: 100
+  Max message size: 1MB
+
+Our rules:
+  - One connection per browser tab (Supabase client singleton)
+  - Subscribe only to visible data:
+    Enter page → subscribe
+    Leave page → unsubscribe
+  - Never subscribe to entire tables. Always filter:
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'entities',
+      filter: `project_id=eq.${projectId}`
+    })
+
+  - Fallback: if Realtime disconnects, poll every 30s
+  - Studio dashboard: max 5 subscriptions active
+  - Canvas session: 1 subscription (session row changes)
+  - Domain map: 1 subscription (entities for current project)
+```
+
+---
+
+## AI Budget
+
+### Token Cost Controls
+
+```
+Per-session limits (Canvas mode):
+  Max messages: 20
+  Max input tokens: 50,000
+  Max output tokens: 30,000
+  Estimated max cost: ~$2.50 per session
+
+Per-change limits (Architect + Builder):
+  Architect (proposal): max 100K input, 20K output → ~$3
+  Builder (execution): max 200K input, 50K output → ~$8
+  Total per change: ~$11 max
+
+Monthly budget caps:
+  Canvas sessions: $200/month (soft limit, alert at $150)
+  Pipeline (Architect+Builder): $500/month (hard limit)
+  Scout (codebase scanning): $100/month (hard limit)
+  Total: $800/month hard cap
+
+Implementation:
+  - Track tokens per request in activity_log
+  - Aggregate daily in costs table
+  - Cloudflare Worker checks budget before AI call
+  - If over soft limit: email Pavel
+  - If over hard limit: reject with "Budget exceeded, contact admin"
+
+Dashboard: /studio/costs shows burn rate + projected monthly
+```
+
+---
+
+## Forms
+
+### Library: react-hook-form + zod
+
+```
+Every form uses:
+  - react-hook-form for state management
+  - zod for validation (same schema as API)
+  - @hookform/resolvers/zod for bridge
+
+Pattern:
+  const schema = z.object({
+    name: z.string().min(1, 'Required'),
+    email: z.string().email('Invalid email'),
+  });
+
+  type FormData = z.infer<typeof schema>;
+
+  const form = useForm<FormData>({
+    resolver: zodResolver(schema),
+    defaultValues: { name: '', email: '' },
+  });
+
+Rules:
+  - One schema per form, colocated with the form component
+  - Shared schemas in @rapoport/db (same as API validation)
+  - Never use uncontrolled inputs
+  - Always show inline errors (not toast)
+  - Submit button disabled while submitting
+  - Optimistic: show success immediately, rollback on error
+```
+
+---
+
+## Entity Visual System
+
+### CSS Variable Mapping
+
+```
+Each entity's visual_identity feeds CSS variables:
+
+Entity definition (in DB):
+  visual_identity: {
+    palette: { primary: '#2563EB', accent: '#F59E0B' },
+    mood: 'professional',
+    references: ['https://example.com/mood.png']
+  }
+
+Rendered as CSS variables (scoped to entity card):
+  --entity-primary: #2563EB;
+  --entity-accent: #F59E0B;
+  --entity-bg: color-mix(in srgb, var(--entity-primary) 5%, white);
+  --entity-border: color-mix(in srgb, var(--entity-primary) 20%, transparent);
+
+Usage in components:
+  <div style={{ '--entity-primary': entity.palette.primary }}>
+    <EntityCard />  /* uses var(--entity-primary) internally */
+  </div>
+
+Fallback: if no palette defined, use category defaults:
+  user → blue
+  service → green
+  content → purple
+  transaction → amber
+  external → gray
+```
+
+---
+
+## Testing Strategy
+
+### Integration Tests
+
+```
+Unit tests: vitest — pure functions, adapters, schemas
+Integration tests: vitest + Supabase local — API routes, RLS
+E2E tests: Playwright — critical user journeys only
+
+Integration test setup:
+  - Supabase local (supabase start) in CI
+  - Seed test data via SQL fixtures
+  - Test actual RLS policies with real JWT tokens
+  - Clean database between test suites (TRUNCATE + reseed)
+
+What gets integration tests:
+  - Every API route (happy path + auth failure + validation error)
+  - Every RLS policy (anon, user, admin, cross-org)
+  - Webhook handlers (signature valid, invalid, replay)
+  - AI output parsing (valid JSON, malformed, timeout)
+
+What does NOT get integration tests:
+  - UI components (use unit tests + Storybook)
+  - Third-party API calls (mock at adapter boundary)
+```
+
+### Realtime Testing
+
+```
+Supabase Realtime is hard to test. Strategy:
+
+Unit level:
+  - Mock Supabase channel, test callback handlers
+  - Test TanStack Query cache invalidation logic
+
+Integration level:
+  - Supabase local includes Realtime
+  - Test: INSERT row → subscription callback fires
+  - Test: unsubscribe → no more callbacks
+
+E2E level (Playwright):
+  - Open two browser contexts
+  - User A adds entity → User B sees it appear
+  - Test reconnection: kill websocket → verify recovery
+```
+
+### Seed Data
+
+```
+Three seed profiles for testing:
+
+Minimal:
+  1 org (VIVOD), 1 user (Pavel), 1 project, 2 entities
+
+Realistic:
+  3 orgs, 5 users (admin + clients + network),
+  3 projects at different phases, 15 entities,
+  5 canvas sessions (various fit scores),
+  10 messages, 3 invoices
+
+Stress:
+  10 orgs, 50 users, 20 projects,
+  200 entities, 500 relationships,
+  100 canvas sessions, 1000 messages
+
+Edge cases in seed data:
+  - Entity with empty visual_identity
+  - Project with 0 entities
+  - Canvas session at message 20 (max limit)
+  - Invoice overdue by 30 days
+  - User with revoked sessions
+  - Organization with single member (owner)
+  - Hebrew content (RTL test)
+  - Emoji in entity names
+  - Very long description (10K chars)
+```
+
+### Migration Testing
+
+```
+Every Supabase migration is tested before apply:
+
+Process:
+  1. supabase db reset (applies all migrations fresh)
+  2. Run seed data
+  3. Run integration tests
+  4. If pass → safe to apply to staging
+
+CI pipeline:
+  migration changed → reset → seed → test → green = merge
+
+Never:
+  - Apply migration directly to production
+  - Write migration without DOWN (rollback)
+  - Modify existing migration (create new one)
+```
+
+### Load Testing
+
+```
+Not in MVP. Add when:
+  - Canvas sessions > 50/day
+  - Concurrent Studio users > 10
+  - Pipeline changes > 20/day
+
+When added:
+  Tool: k6 (JavaScript, runs in CI)
+  Targets:
+    API: 100 req/s sustained, p99 < 500ms
+    Realtime: 50 concurrent subscriptions
+    Canvas: 10 concurrent sessions
+    AI: handled by budget caps (not load)
+```
+
+---
+
+## UX Conventions
+
+### Dark Mode
+
+```
+Decision: DEFER. Ship light mode only for MVP.
+
+Preparation (do now so it's easy later):
+  - All colors via CSS variables (already required)
+  - No hardcoded colors in components
+  - Use semantic tokens: --color-bg, --color-text,
+    --color-border, --color-surface
+  - When dark mode is added: swap variable values in
+    @media (prefers-color-scheme: dark) or data-theme="dark"
+```
+
+### Responsive Strategy
+
+```
+Breakpoints (Tailwind defaults):
+  sm: 640px    → mobile landscape
+  md: 768px    → tablet
+  lg: 1024px   → small desktop
+  xl: 1280px   → desktop
+  2xl: 1536px  → wide desktop
+
+Per-app behavior:
+  pavelrapoport.com (public):
+    Mobile-first. Full responsive.
+    Chat + domain map: stack vertically on mobile.
+    Domain map: touch gestures (pinch to zoom).
+
+  Studio (/studio):
+    Desktop-first. Min width: 1024px.
+    On tablet: simplified layout, no side panels.
+    On mobile: show warning "Studio works best on desktop"
+    + limited read-only view (inbox, project list).
+
+  Client portal (future):
+    Fully responsive. Mostly read-only content.
+```
+
+### Empty States
+
+```
+Every list, table, and dashboard has an empty state.
+
+Pattern:
+  <EmptyState
+    icon={<IconName />}
+    title="No projects yet"
+    description="Create your first project to get started."
+    action={{ label: "Create project", onClick: handleCreate }}
+  />
+
+Rules:
+  - Always explain WHY it's empty
+  - Always provide a clear next action
+  - Use illustration or icon (not just text)
+  - Empty state should guide, not confuse
+
+Examples:
+  Inbox: "No new leads. Share your site to get conversations flowing."
+  Projects: "No projects yet. Accept a lead from your inbox to start."
+  Entities: "Empty domain map. Add your first entity."
+  Pipeline: "No changes in progress. Create a change to start building."
+  Costs: "No costs tracked yet. Costs appear after AI usage."
+```
+
+### Loading & Skeleton Patterns
+
+```
+Three loading states:
+
+1. Page load (initial):
+   Full page skeleton. Match the layout shape.
+   Use Tailwind animate-pulse on gray rectangles.
+
+2. Section load (lazy data):
+   Skeleton only for the loading section.
+   Keep navigation and layout visible.
+
+3. Action load (button click):
+   Disable button + spinner icon.
+   Never block the whole page for a button action.
+
+Skeleton component:
+  <Skeleton className="h-4 w-[200px]" />
+  <Skeleton className="h-10 w-full rounded-lg" />
+
+Rule: skeleton shape MUST match the real content shape.
+Never show a generic spinner for page/section loads.
+Spinner is OK only for inline actions (button, save).
+```
+
+### Drag & Drop
+
+```
+Library: @dnd-kit/core + @dnd-kit/sortable
+
+Used for:
+  - Pipeline kanban (drag changes between phases)
+  - Entity sort order (drag to reorder in domain map list)
+  - Creative assets (drag to reorder)
+
+Not used for:
+  - Domain map (React Flow handles its own drag)
+  - Forms (no drag in form fields)
+
+Keyboard support (required):
+  Space: pick up / drop
+  Arrow keys: move item
+  Escape: cancel drag
+  Tab: move focus between draggable items
+```
+
+### Icons
+
+```
+Library: Lucide React (lucide-react)
+
+Rules:
+  - Import individual icons: import { Plus } from 'lucide-react'
+  - Never import the entire library
+  - Size: 16px inline, 20px buttons, 24px navigation
+  - Always pair with text label (accessibility)
+  - strokeWidth: 2 (default)
+
+Mapping (common):
+  Add: Plus
+  Edit: Pencil
+  Delete: Trash2
+  Search: Search
+  Settings: Settings
+  User: User
+  Project: FolderKanban
+  Entity: Shapes
+  Money: DollarSign
+  AI/Muse: Sparkles
+  External link: ExternalLink
+  Close: X
+  Menu: Menu
+  Back: ArrowLeft
+```
+
+### Typography Scale
+
+```
+Using Tailwind defaults (rem-based):
+
+text-xs:   0.75rem / 1rem      → labels, captions
+text-sm:   0.875rem / 1.25rem  → secondary text, table cells
+text-base: 1rem / 1.5rem       → body text (default)
+text-lg:   1.125rem / 1.75rem  → card titles, section headers
+text-xl:   1.25rem / 1.75rem   → page section titles
+text-2xl:  1.5rem / 2rem       → page titles
+text-3xl:  1.875rem / 2.25rem  → landing page headings
+text-4xl:  2.25rem / 2.5rem    → hero heading only
+
+Font stack:
+  Sans: Inter (primary), system-ui fallback
+  Mono: JetBrains Mono (code blocks, specs)
+
+Weight:
+  400 (normal): body text
+  500 (medium): labels, navigation
+  600 (semibold): headings, buttons
+  700 (bold): hero, emphasis only
+```
+
+### 3D / Experimental Visual
+
+```
+Decision: NOT in MVP. Mark as future exploration.
+
+If added later:
+  - Three.js via React Three Fiber (@react-three/fiber)
+  - Only on landing page hero (not in Studio)
+  - Must degrade gracefully: if WebGL unavailable,
+    show static illustration instead
+  - Performance budget: < 100ms first paint addition
+  - Lazy load: never in initial bundle
+```
+
+---
+
+## Accessibility (additions)
+
+### RTL Mixed Content
+
+```
+When Hebrew (RTL) page contains English (LTR) content:
+  - Use dir="auto" on user-generated content blocks
+  - Use <bdi> for inline mixed-direction text
+  - Entity names: always dir="auto" (could be any language)
+  - Code blocks: always dir="ltr" (code is LTR)
+  - Numbers: always LTR (CSS unicode-bidi: embed)
+
+Test: switch to Hebrew, verify English entity names
+render correctly within RTL layout.
+```
+
+### Status Badges
+
+```
+Every status badge MUST have both color AND icon/text.
+Never rely on color alone.
+
+Pattern:
+  <Badge variant="success">
+    <CheckIcon /> Active
+  </Badge>
+
+Status → icon mapping:
+  active    → CheckCircle (green)
+  draft     → Circle (gray)
+  review    → Eye (blue)
+  approved  → ThumbsUp (green)
+  declined  → XCircle (red)
+  overdue   → AlertTriangle (amber)
+  completed → CheckCheck (green)
+```
+
+### Progressive Disclosure Navigation
+
+```
+Studio navigation uses progressive disclosure:
+  Level 1: main nav (Projects, Inbox, Costs, Settings)
+  Level 2: project tabs (Domain, Creative, Specs, Pipeline)
+  Level 3: entity detail panel (slide-out)
+
+Accessibility:
+  - Each level is a landmark (<nav>, <main>, <aside>)
+  - Focus moves to new level on navigation
+  - Escape closes current level, returns focus to parent
+  - Breadcrumb shows full path at all times
+  - Screen reader: "You are in Project X, Domain tab,
+    viewing Entity Y"
+```
+
+### Screen Reader Testing
+
+```
+Test with:
+  macOS: VoiceOver (Safari) — primary
+  Windows: NVDA (Firefox) — secondary
+  Mobile: VoiceOver iOS, TalkBack Android — for public site
+
+Test checklist per page:
+  □ Page title announced on load
+  □ All landmarks present and labeled
+  □ Tab order follows visual order
+  □ All interactive elements have labels
+  □ Status changes announced (aria-live)
+  □ Modals trap focus
+  □ Error messages linked to fields
+
+Frequency:
+  Before each release: test critical paths
+  Quarterly: full audit of all pages
+```

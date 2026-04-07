@@ -210,7 +210,7 @@ Tasks SHALL respect organization and project access rules.
 
 ### Requirement: Task Priority
 
-The system SHALL support priority levels for all tasks.
+The system SHALL support prioritizing tasks by urgency level.
 
 #### Scenario: Priority levels
 - **GIVEN** a task is created

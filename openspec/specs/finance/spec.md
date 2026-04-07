@@ -47,8 +47,8 @@ The system SHALL calculate profit and loss per project.
 The system SHALL support monthly and quarterly financial goals.
 
 #### Scenario: Setting a financial goal
-- **WHEN** Pavel sets a revenue goal for a quarter
-- **THEN** the system tracks progress against the goal
+- **WHEN** Pavel creates a financial goal for a time period
+- **THEN** the system tracks progress against the target amount
 
 ### Requirement: Reports
 
@@ -57,7 +57,7 @@ by client, by time period.
 
 #### Scenario: Generating a margin report
 - **WHEN** Pavel requests a report for a time period
-- **THEN** the system shows margin breakdown by project and client
+- **THEN** the system shows margin broken down by project and client
 
 ## Entities
 

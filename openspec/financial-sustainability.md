@@ -276,3 +276,40 @@ This is Rule #8: Revenue before roadmap.
 It's in identity.md. It's in the finance dashboard.
 It's in the monthly review. There is no escape.
 ```
+
+---
+
+## KPIs & Metrics (tracked in PostHog + Studio)
+
+### Revenue metrics
+- MRR (Monthly Recurring Revenue) — maintenance contracts
+- Pipeline value — sum of active quotes
+- Close rate — accepted / total leads
+- Average project value
+- Revenue per client (lifetime)
+
+### Lead metrics
+- Canvas sessions per week
+- Fit score distribution (1-10)
+- Session → lead conversion rate
+- Lead → client conversion rate
+- Source breakdown (direct / referral / LinkedIn / organic)
+- Time from session to first response
+
+### Delivery metrics
+- Projects in progress
+- Average delivery time (start → ship)
+- Change cycle time (create → PR merged)
+- AI cost per project
+- Margin per project (revenue - all costs)
+
+### Health metrics
+- Cash runway (months)
+- Monthly burn rate
+- Overdue invoices
+- Network utilization (assigned / total members)
+
+### Dashboard
+Studio → /studio/costs shows all metrics.
+Weekly email digest with key numbers (automated).
+Monthly review: compare actual vs targets.

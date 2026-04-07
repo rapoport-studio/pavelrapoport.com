@@ -58,11 +58,13 @@ React 19, Next.js 15 (App Router), TypeScript, Tailwind CSS,
 D3.js, SVG, Canvas, XState
 
 **Backend:**
-NestJS, Node.js, Supabase (PostgreSQL, Auth, RLS)
+NestJS, Node.js, Supabase (PostgreSQL, Auth, RLS, Realtime),
+Redis (server-side cache, sessions, queues)
 
 **Infrastructure:**
-Turborepo monorepo, pnpm, npm packages with independent
-versioning, Cloudflare Pages
+Turborepo monorepo, pnpm, Cloudflare Pages (frontends),
+Railway (API + Redis + workers), npm packages with
+independent versioning
 
 **AI:**
 Claude (Opus), MCP servers, RAG pipelines, XState agents,
@@ -98,37 +100,37 @@ apps/
       finance/
 
 packages/
-  @repo/ui            → design system (shadcn/ui components)
-  @repo/db            → Supabase client, types, migrations
-  @repo/ai            → agent logic, prompts, mode switching
-  @repo/auth          → authentication, roles, permissions
-  @repo/config        → connection configs, secrets management
-  @repo/domain-map    → interactive entity graph (React Flow)
+  @rapoport/ui            → design system (shadcn/ui components)
+  @rapoport/db            → Supabase client, types, migrations
+  @rapoport/ai            → agent logic, prompts, mode switching
+  @rapoport/auth          → authentication, roles, permissions
+  @rapoport/config        → connection configs, secrets management
+  @rapoport/domain-map    → interactive entity graph (React Flow)
                         standalone-extractable
 ```
 
-### @repo/ui
+### @rapoport/ui
 
 Built on shadcn/ui. All components live here, never in apps.
 Both web and studio consume from the same library.
 
-### @repo/db
+### @rapoport/db
 
 Supabase client, generated types, RLS policies, migrations.
 Single source of truth for all database access.
 
-### @repo/ai
+### @rapoport/ai
 
 Agent core: mode definitions (Canvas, Scout, Architect, Builder),
 system prompts, structured output schemas, model selection,
 token tracking. Consumed by both apps and by CLI tools.
 
-### @repo/auth
+### @rapoport/auth
 
 Supabase Auth wrapper, role definitions (owner, client, network,
 public), permission checks, middleware. Shared across apps.
 
-### @repo/config
+### @rapoport/config
 
 Connection management layer for all 21 integrations:
 - `getConnection(type, projectId?)` → config + status
@@ -139,7 +141,7 @@ Connection management layer for all 21 integrations:
 Secrets stored in Supabase (encrypted) or Cloudflare secrets.
 Package abstracts the source — app doesn't care where keys live.
 
-### @repo/domain-map
+### @rapoport/domain-map
 
 React Flow-based entity graph visualizer. Renders domain maps
 from OpenSpec data. Designed for standalone extraction as
@@ -419,3 +421,87 @@ No spreadsheets — it's in the system.
 - Planning — monthly/quarterly financial goals
 - Reports — margin by project, by client, by period
 - Future: automated invoicing, tax export
+---
+
+## MVP Phases
+
+### Phase 1 — "Client can come" (4-6 weeks)
+
+Revenue-first. Public site works, client can discover Pavel,
+talk to Muse, become a lead.
+
+```
+Domains:
+  auth           → login, roles, RLS, MFA
+  web            → landing, portfolio, case studies
+  blog           → articles, SEO, content
+  messages       → AI chat (Canvas mode), notifications
+  clients        → lead → client, qualification, CRM
+
+Result:
+  Visitor → pavelrapoport.com → talks to Muse →
+  domain map appears → lead created → Pavel reviews →
+  accepts → sends quote
+
+Revenue unblocked: Pavel can find clients and invoice them.
+```
+
+### Phase 2 — "Pavel can manage" (4-6 weeks)
+
+Operational backbone. Projects, teams, money tracking.
+
+```
+Domains:
+  organizations  → org structure, membership, org switcher
+  projects       → create, domain map, specs, pipeline
+  studio         → dashboard, visualizer, workspace
+  tasks          → task management, assignments, AI delegation
+  finance        → invoices, P&L, costs, revenue dashboard
+
+Result:
+  Pavel manages projects in Studio → assigns network →
+  tracks costs → invoices clients → sees P&L
+
+Efficiency: no spreadsheets, no manual tracking.
+```
+
+### Phase 3 — "Scale & automate" (ongoing)
+
+Full automation. AI builds code, services sync, network operates.
+
+```
+Domains:
+  integrations   → Linear, GitHub, full bi-directional sync
+  network        → freelancer management, briefs, deliverables
+  domains        → DNS, multi-domain, SSL, email
+  ai             → Scout, Architect, Builder modes full pipeline
+
+Result:
+  OpenSpec → Muse Architect → proposal → approve →
+  Muse Builder → PR → deploy. Automated.
+
+Scale: platform runs without Pavel in the loop for routine tasks.
+```
+
+### Deep vs Shallow Specs
+
+```
+Phase 1 domains — DEEP specs required before build:
+  Each domain: 8-15 scenarios, data model, API endpoints,
+  entity views, edge cases. Same depth as auth/spec.md.
+
+Phase 2 domains — DEEP specs required before build:
+  Same standard. No code without deep spec.
+
+Phase 3 domains — SHALLOW specs OK for now:
+  Current 3-4 scenarios sufficient for planning.
+  Deepen when Phase 3 starts.
+```
+
+### Rule
+
+```
+Don't start Phase 2 until Phase 1 is live and generating leads.
+Don't start Phase 3 until Phase 2 is operational.
+Revenue before roadmap. Always.
+```

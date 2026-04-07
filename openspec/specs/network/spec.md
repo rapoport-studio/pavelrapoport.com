@@ -51,6 +51,28 @@ The system SHALL track deliverables per assignment.
 - **WHEN** a network member uploads work
 - **THEN** it goes through: upload → review → approve cycle
 
+### Requirement: Partner Onboarding
+
+The system SHALL support a structured onboarding flow for
+new network members.
+
+#### Scenario: Onboarding a new partner
+- **GIVEN** Pavel wants to add a freelancer to the network
+- **THEN** the onboarding flow is:
+  1. Pavel creates member profile (name, specialty, rate)
+  2. System sends invite email with login link
+  3. Member signs NDA (standard template, DocuSign or PDF)
+  4. Member completes profile: portfolio, timezone, availability
+  5. Status: pending → active
+  6. Member appears in search/filter for project assignments
+
+#### Scenario: Trial assignment
+- **GIVEN** a newly onboarded member
+- **WHEN** Pavel assigns them to their first project
+- **THEN** assignment is tagged as "trial"
+- **AND** Pavel reviews deliverable quality after completion
+- **AND** member gets a trust_score (1-5) based on the trial
+
 ## Entities
 
 - **Member** — a person in Pavel's professional network
