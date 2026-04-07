@@ -161,6 +161,83 @@ doesn't leak.
 | Integration key compromise | Medium | Encryption + rotation + audit |
 | XSS attack | Medium | CSP headers + input sanitization |
 | CSRF attack | Low | Origin verification + SameSite cookie |
+| Data loss (no backup) | Medium | PITR + daily backups + restore procedure |
+
+### Layer 8: Backup & Disaster Recovery
+
+Last line of defense — when everything else fails.
+
+**Recovery targets:**
+
+```
+RPO (max data loss):   1 hour
+  → Supabase Pro: point-in-time recovery (PITR)
+  → Every change is recoverable up to 1 hour back
+
+RTO (max downtime):    4 hours
+  → From "we noticed the problem" to "everything works"
+  → Includes: assess damage, restore, verify, re-deploy
+```
+
+**What is backed up:**
+
+```
+Supabase PostgreSQL:
+  → PITR enabled (Supabase Pro plan, automatic)
+  → Daily logical backup (pg_dump) to separate storage
+  → Retain: 7 daily + 4 weekly + 3 monthly
+
+Supabase Storage:
+  → Files replicated by Supabase (S3-compatible)
+  → Critical files (contracts, NDA): copy to Cloudflare R2
+
+Secrets:
+  → Documented in secrets-registry.md
+  → If Supabase is compromised: rotate all keys from registry
+
+Code:
+  → Git is the backup. GitHub retains all history.
+  → OpenSpec files are in the repo.
+```
+
+**Disaster scenarios:**
+
+```
+Scenario: Accidental table deletion
+  → Restore from PITR to point before deletion
+  → Verify data integrity
+  → Time: < 1 hour
+
+Scenario: Supabase outage
+  → Platform shows "maintenance mode" page (Cloudflare)
+  → Wait for Supabase recovery
+  → Verify data, resume
+  → Time: depends on Supabase (typically < 2 hours)
+
+Scenario: Compromised admin account
+  → Revoke all sessions (Supabase dashboard)
+  → Rotate all secrets from registry
+  → Audit log review: what was accessed/changed
+  → Restore data if modified
+  → Time: 2-4 hours
+
+Scenario: Full data loss (worst case)
+  → Restore PostgreSQL from latest daily backup
+  → Restore files from Cloudflare R2 copy
+  → Re-deploy apps from Git
+  → Accept: up to 24 hours of data loss
+  → Time: 4-8 hours
+```
+
+**Monthly drill:**
+
+```
+Every month, verify:
+  □ PITR is enabled and working (Supabase dashboard)
+  □ Daily backup ran successfully
+  □ Restore test: restore to a test project, verify row count
+  □ Secrets registry matches actual deployed secrets
+```
 
 ---
 
