@@ -424,6 +424,19 @@ data access at the database level.
 - **GIVEN** a middleware bug
 - **THEN** RLS still blocks unauthorized access
 
+#### Scenario: Cross-project isolation test
+- **GIVEN** user A is member of Org X, assigned to Project 1 only
+- **AND** Project 2 also belongs to Org X
+- **WHEN** user A queries Project 2 data
+- **THEN** RLS returns zero rows
+- **AND** this scenario SHALL be covered by automated tests in CI
+
+#### Scenario: Cross-org isolation test
+- **GIVEN** user A is member of Org X and Org Y
+- **WHEN** user A is in Org X context and queries Org Y data
+- **THEN** RLS returns zero rows
+- **AND** this scenario SHALL be covered by automated tests in CI
+
 ---
 
 ### Requirement: Session Expiry
@@ -478,6 +491,15 @@ All auth logic lives here. Apps import, never implement.
 - `validateInput(schema, data)` → zod validation
 - `sanitizeOutput(data, role)` → strip sensitive fields
 - `auditLog(action, userId, detail)` → security event log
+
+**Testing:**
+- `testRLSPolicy(table, userId, expectedRows)` → CI helper
+- `RLS_TEST_MATRIX` → predefined test cases:
+  - anon → 0 rows on all protected tables
+  - user (no org) → 0 rows on org-scoped tables
+  - member → only assigned project rows
+  - admin → all org rows, not other orgs
+  - platform admin → all rows
 
 **Config:**
 - `AUTH_ROUTES` → public / auth-required / admin-only map
