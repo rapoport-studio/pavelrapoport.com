@@ -39,6 +39,7 @@ context: |
   - web — public landing, about, services, case studies
   - studio — internal workspace, project execution dashboard
   - clients — client portal (projects, status, deliverables)
+  - organizations — companies, partnerships, studios that own projects
   - projects — project management, specs, timelines
   - finance — invoices, payments, revenue tracking
   - blog — articles, case studies, insights (MDX, bilingual en/ru)
