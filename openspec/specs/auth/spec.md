@@ -60,7 +60,7 @@ User (authenticated)
 
 ### Access Model: Three Levels
 
-Three nested levels of access control:
+Three levels of access, nested:
 
 ```
 Platform (role: admin | user)
@@ -69,28 +69,53 @@ Platform (role: admin | user)
 ```
 
 Access check — three questions in order:
-1. Authenticated? → no → login
-2. Member of organization? → no → 403
-3. Has project access? → owner/admin see all, member/viewer only assigned
+1. Authenticated? → no → redirect to login
+2. Member of the project's organization? → no → 403
+3. Has access to this project?
+   - org owner/admin → YES, all org projects
+   - org member/viewer → only if assigned
+   - platform admin → YES, everything everywhere
 
-### Database Tables
+Database tables for access:
 
 ```
 organization_members:
-  id, organization_id → organizations.id, user_id → profiles.id,
-  org_role (owner | admin | member | viewer), joined_at
+  id, organization_id → organizations.id,
+  user_id → profiles.id,
+  org_role (owner | admin | member | viewer),
+  joined_at
 
 project_assignments:
-  id, project_id → projects.id, user_id → profiles.id
+  id, project_id → projects.id,
+  user_id → profiles.id
 ```
 
-### RLS Function: can_access_project(project_id)
+RLS function — single security definer:
 
-Security definer function — single source of truth for project access:
-- Platform admin → sees everything
-- Org owner/admin → sees all projects in their org
-- Org member/viewer → sees only assigned projects
-- Not in org → no access
+```
+can_access_project(project_id uuid) returns boolean:
+  - platform admin (profiles.role = 'admin') → true
+  - org owner/admin of project's org → true
+  - assigned to project via project_assignments → true
+  - otherwise → false
+```
+
+### Permission Map
+
+Static permission map in `@rapoport/auth`, no external
+RBAC tools needed at this scale:
+
+```
+ORG_PERMISSIONS:
+  owner:  ['*']
+  admin:  ['projects.manage', 'members.invite', 'members.remove',
+           'specs.edit', 'pipeline.approve']
+  member: ['projects.view', 'specs.view', 'deliverables.upload',
+           'messages.send']
+  viewer: ['projects.view', 'specs.view']
+```
+
+One function: `hasPermission(orgRole, action)` → boolean
 
 ### Network Groups
 
@@ -458,7 +483,8 @@ All auth logic lives here. Apps import, never implement.
 - `AUTH_ROUTES` → public / auth-required / admin-only map
 - `COOKIE_DOMAIN` → `.pavelrapoport.com`
 - `REDIRECT_DEFAULTS` → { admin, client, network, user }
-- `ORG_PERMISSIONS` → map of org_role to allowed actions
+- `ORG_PERMISSIONS` → static map of org_role to allowed actions
+- `hasPermission(orgRole, action)` → boolean check
 
 ### What is NOT in @rapoport/auth
 
