@@ -7,11 +7,19 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "db:migrate": "supabase db push --db-url \"$DATABASE_URL\"",
-    "db:reset": "supabase db reset",
-    "db:types": "supabase gen types typescript --local > src/generated-types.ts"
+    "generate-types": "supabase gen types typescript --project-id mtavnbjdgldttqdpwouo > src/types.ts",
+    "db:types": "pnpm generate-types",
+    "db:push": "supabase db push --db-url \"$DATABASE_URL\"",
+    "db:pull": "supabase db pull",
+    "db:reset": "supabase db reset"
+  },
+  "dependencies": {
+    "@repo/config": "workspace:*",
+    "@supabase/supabase-js": "^2"
   },
   "devDependencies": {
+    "@types/node": "^20",
+    "supabase": "^2",
     "typescript": "^5"
   }
 }
