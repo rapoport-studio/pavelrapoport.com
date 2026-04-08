@@ -84,6 +84,11 @@ jobs:
       - name: Build (OpenNext → Cloudflare)
         run: pnpm --filter @repo/web exec opennextjs-cloudflare build
 
+      - name: Verify Cloudflare secrets
+        run: |
+          test -n "${{ secrets.CLOUDFLARE_API_TOKEN }}" || { echo "::error::Missing CLOUDFLARE_API_TOKEN secret"; exit 1; }
+          test -n "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" || { echo "::error::Missing CLOUDFLARE_ACCOUNT_ID secret"; exit 1; }
+
       - name: Deploy to Cloudflare Workers
         id: deploy
         uses: cloudflare/wrangler-action@v3
@@ -143,6 +148,11 @@ jobs:
 
       - name: Build (OpenNext → Cloudflare)
         run: pnpm --filter @repo/studio exec opennextjs-cloudflare build
+
+      - name: Verify Cloudflare secrets
+        run: |
+          test -n "${{ secrets.CLOUDFLARE_API_TOKEN }}" || { echo "::error::Missing CLOUDFLARE_API_TOKEN secret"; exit 1; }
+          test -n "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" || { echo "::error::Missing CLOUDFLARE_ACCOUNT_ID secret"; exit 1; }
 
       - name: Deploy to Cloudflare Workers
         id: deploy
