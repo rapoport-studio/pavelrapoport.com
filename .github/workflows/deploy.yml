@@ -51,7 +51,8 @@ jobs:
       - name: Install Infisical CLI
         run: |
           set -euo pipefail
-          curl -1sLf 'https://raw.githubusercontent.com/Infisical/infisical/main/scripts/install.sh' | bash
+          curl -sSfL --retry 5 --retry-all-errors \
+            'https://raw.githubusercontent.com/Infisical/infisical/main/scripts/install.sh' | bash
           infisical --version
 
       - name: Load secrets from Infisical
@@ -129,7 +130,8 @@ jobs:
       - name: Install Infisical CLI
         run: |
           set -euo pipefail
-          curl -1sLf 'https://raw.githubusercontent.com/Infisical/infisical/main/scripts/install.sh' | bash
+          curl -sSfL --retry 5 --retry-all-errors \
+            'https://raw.githubusercontent.com/Infisical/infisical/main/scripts/install.sh' | bash
           infisical --version
 
       - name: Load secrets from Infisical
