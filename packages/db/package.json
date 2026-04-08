@@ -6,7 +6,10 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "supabase db push --db-url \"$DATABASE_URL\"",
+    "db:reset": "supabase db reset",
+    "db:types": "supabase gen types typescript --local > src/generated-types.ts"
   },
   "devDependencies": {
     "typescript": "^5"
