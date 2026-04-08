@@ -1,3 +1,4 @@
+# Deploy apps to Cloudflare Workers via OpenNext
 name: Deploy
 
 on:
