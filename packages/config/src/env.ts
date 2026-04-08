@@ -31,10 +31,13 @@ const envSchema = z.object({
 
 export type Env = z.infer<typeof envSchema>;
 
-let _env: Env | undefined;
+export const env = new Proxy({} as Env, {
+  get(_, prop: string) {
+    return process.env[prop];
+  },
+});
 
-function parseEnv(): Env {
-  if (_env) return _env;
+export function validateEnv(): Env {
   const result = envSchema.safeParse(process.env);
   if (!result.success) {
     const missing = result.error.issues
@@ -42,12 +45,5 @@ function parseEnv(): Env {
       .join("\n");
     throw new Error(`Missing or invalid environment variables:\n${missing}`);
   }
-  _env = result.data;
-  return _env;
+  return result.data;
 }
-
-export const env = new Proxy({} as Env, {
-  get(_, prop: string) {
-    return parseEnv()[prop as keyof Env];
-  },
-});
