@@ -27,6 +27,9 @@ const envSchema = z.object({
   GOOGLE_WORKSPACE_ADMIN: z.string().email().optional(),
   GOOGLE_OAUTH_CLIENT_ID: z.string().min(1).optional(),
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().min(1).optional(),
+
+  // Public URLs (optional — set per environment)
+  NEXT_PUBLIC_SITE_URL: z.string().url().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
