@@ -53,6 +53,8 @@ jobs:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           CLOUDFLARE_API_TOKEN: op://CI/cloudflare/api-token
           CLOUDFLARE_ACCOUNT_ID: op://CI/cloudflare/account-id
+          SUPABASE_URL: op://CI/supabase/url
+          SUPABASE_ANON_KEY: op://CI/supabase/anon-key
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -102,6 +104,8 @@ jobs:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           CLOUDFLARE_API_TOKEN: op://CI/cloudflare/api-token
           CLOUDFLARE_ACCOUNT_ID: op://CI/cloudflare/account-id
+          SUPABASE_URL: op://CI/supabase/url
+          SUPABASE_ANON_KEY: op://CI/supabase/anon-key
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4

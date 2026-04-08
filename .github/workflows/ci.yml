@@ -18,6 +18,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Load secrets from 1Password
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          SUPABASE_URL: op://CI/supabase/url
+          SUPABASE_ANON_KEY: op://CI/supabase/anon-key
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
