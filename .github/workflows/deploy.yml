@@ -96,7 +96,7 @@ jobs:
       - name: Build (Next.js)
         run: pnpm turbo build --filter=@repo/web
 
-      - name: Build (OpenNext → Cloudflare)
+      - name: Build for Cloudflare
         run: pnpm --filter @repo/web exec opennextjs-cloudflare build
 
       - name: Verify Cloudflare secrets
@@ -104,19 +104,13 @@ jobs:
           set -euo pipefail
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "::error::Missing CLOUDFLARE_API_TOKEN env var (check Infisical)"; exit 1; }
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "::error::Missing CLOUDFLARE_ACCOUNT_ID env var (check Infisical)"; exit 1; }
-          if echo "$CLOUDFLARE_ACCOUNT_ID" | grep -qE "['\"[:space:]]"; then
-            echo "::error::CLOUDFLARE_ACCOUNT_ID contains quotes or spaces — fix the value in Infisical (store without quotes)."
-            exit 1
-          fi
 
       - name: Deploy to Cloudflare Workers
         id: deploy
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: apps/web
-          command: deploy
+        run: pnpm --filter @repo/web exec opennextjs-cloudflare deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ env.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
 
   deploy-studio:
     name: Deploy Studio
@@ -180,7 +174,7 @@ jobs:
       - name: Build (Next.js)
         run: pnpm turbo build --filter=@repo/studio
 
-      - name: Build (OpenNext → Cloudflare)
+      - name: Build for Cloudflare
         run: pnpm --filter @repo/studio exec opennextjs-cloudflare build
 
       - name: Verify Cloudflare secrets
@@ -188,16 +182,10 @@ jobs:
           set -euo pipefail
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "::error::Missing CLOUDFLARE_API_TOKEN env var (check Infisical)"; exit 1; }
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "::error::Missing CLOUDFLARE_ACCOUNT_ID env var (check Infisical)"; exit 1; }
-          if echo "$CLOUDFLARE_ACCOUNT_ID" | grep -qE "['\"[:space:]]"; then
-            echo "::error::CLOUDFLARE_ACCOUNT_ID contains quotes or spaces — fix the value in Infisical (store without quotes)."
-            exit 1
-          fi
 
       - name: Deploy to Cloudflare Workers
         id: deploy
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: apps/studio
-          command: deploy
+        run: pnpm --filter @repo/studio exec opennextjs-cloudflare deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ env.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
