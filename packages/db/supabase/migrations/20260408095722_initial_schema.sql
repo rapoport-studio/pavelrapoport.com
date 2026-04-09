@@ -1,12 +1,7 @@
--- AI-15: Initial schema — profiles, canvas_sessions, clients + RLS
--- =================================================================
-
--- Enable moddatetime for auto-updating updated_at
+-- Enable moddatetime extension
 create extension if not exists moddatetime with schema extensions;
 
--- ---------------------------------------------------------------------------
--- profiles (1:1 with auth.users)
--- ---------------------------------------------------------------------------
+-- Profiles (1:1 with auth.users)
 create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   display_name text,
@@ -19,31 +14,24 @@ create table public.profiles (
 
 alter table public.profiles enable row level security;
 
--- Users can read their own profile
 create policy "Users can read own profile"
   on public.profiles for select
   to authenticated
   using (auth.uid() = id);
 
--- Admin can read all profiles
 create policy "Admin can read all profiles"
   on public.profiles for select
   to authenticated
   using (
-    exists (
-      select 1 from public.profiles p
-      where p.id = auth.uid() and p.role = 'admin'
-    )
+    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
   );
 
--- Users can update their own profile
 create policy "Users can update own profile"
   on public.profiles for update
   to authenticated
   using (auth.uid() = id);
 
--- Auto-update updated_at
-create trigger profiles_updated_at
+create trigger handle_profiles_updated_at
   before update on public.profiles
   for each row execute procedure extensions.moddatetime(updated_at);
 
@@ -51,23 +39,21 @@ create trigger profiles_updated_at
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.profiles (id, display_name, role)
+  insert into public.profiles (id, display_name, locale)
   values (
     new.id,
-    coalesce(new.raw_user_meta_data ->> 'full_name', new.email),
-    case when new.email = 'hello@pavelrapoport.com' then 'admin' else 'user' end
+    coalesce(new.raw_user_meta_data->>'display_name', split_part(new.email, '@', 1)),
+    'en'
   );
   return new;
 end;
-$$ language plpgsql security definer set search_path to '';
+$$ language plpgsql security definer;
 
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
 
--- ---------------------------------------------------------------------------
--- canvas_sessions
--- ---------------------------------------------------------------------------
+-- Canvas Sessions
 create table public.canvas_sessions (
   id uuid primary key default gen_random_uuid(),
   lead_name text,
@@ -89,42 +75,30 @@ create table public.canvas_sessions (
 
 alter table public.canvas_sessions enable row level security;
 
--- Anon/authenticated can create a session
 create policy "Anyone can create a canvas session"
   on public.canvas_sessions for insert
   to anon, authenticated
   with check (true);
 
--- Admin can read all sessions
 create policy "Admin can read all canvas sessions"
   on public.canvas_sessions for select
   to authenticated
   using (
-    exists (
-      select 1 from public.profiles
-      where id = auth.uid() and role = 'admin'
-    )
+    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
   );
 
--- Admin can update sessions
 create policy "Admin can update canvas sessions"
   on public.canvas_sessions for update
   to authenticated
   using (
-    exists (
-      select 1 from public.profiles
-      where id = auth.uid() and role = 'admin'
-    )
+    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
   );
 
--- Auto-update updated_at
-create trigger canvas_sessions_updated_at
+create trigger handle_canvas_sessions_updated_at
   before update on public.canvas_sessions
   for each row execute procedure extensions.moddatetime(updated_at);
 
--- ---------------------------------------------------------------------------
--- clients
--- ---------------------------------------------------------------------------
+-- Clients
 create table public.clients (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references public.profiles(id),
@@ -143,18 +117,13 @@ create table public.clients (
 
 alter table public.clients enable row level security;
 
--- Admin only: full access
 create policy "Admin can do everything with clients"
   on public.clients for all
   to authenticated
   using (
-    exists (
-      select 1 from public.profiles
-      where id = auth.uid() and role = 'admin'
-    )
+    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
   );
 
--- Auto-update updated_at
-create trigger clients_updated_at
+create trigger handle_clients_updated_at
   before update on public.clients
   for each row execute procedure extensions.moddatetime(updated_at);
