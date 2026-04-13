@@ -50,6 +50,8 @@ context: |
   - integrations — universal connectors to external services (21 types, 7 categories)
   - domains — DNS, subdomains, SSL, email configuration per organization
   - tasks — universal work units, polymorphic assignment (user/AI), 7 sources
+  - infra — Cloudflare infrastructure: Workers, KV, DNS, secrets, CI/CD
+  - whatsapp-agent — WhatsApp AI agent pipeline: Meta API, n8n, Claude, Linear
 
   ## Site Structure
   Public (no auth):
