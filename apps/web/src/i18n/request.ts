@@ -12,10 +12,10 @@ const messageImports = {
       import("@repo/i18n/messages/ru/common.json"),
       import("@repo/i18n/messages/ru/web.json"),
     ]),
-  he: () =>
+  ro: () =>
     Promise.all([
-      import("@repo/i18n/messages/he/common.json"),
-      import("@repo/i18n/messages/he/web.json"),
+      import("@repo/i18n/messages/ro/common.json"),
+      import("@repo/i18n/messages/ro/web.json"),
     ]),
 } as const;
 
