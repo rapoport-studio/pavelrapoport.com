@@ -272,8 +272,9 @@ export async function POST(request: Request) {
       (response.usage.input_tokens ?? 0) +
       (response.usage.output_tokens ?? 0);
 
-    const rawReply =
+    let rawReply =
       response.content[0].type === "text" ? response.content[0].text : "";
+    rawReply = rawReply.replace(/<\/?cite[^>]*>/g, "").trim();
 
     // Strip markdown code fences if present
     const cleanReply = rawReply
