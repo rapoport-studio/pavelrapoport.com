@@ -25,7 +25,7 @@ export async function generateMetadata({
   const t = await getTranslations({ locale, namespace: "web" });
 
   const ogLocale =
-    locale === "ru" ? "ru_RU" : locale === "he" ? "he_IL" : "en_US";
+    locale === "ru" ? "ru_RU" : locale === "ro" ? "ro_RO" : "en_US";
 
   return {
     title: {
@@ -42,7 +42,7 @@ export async function generateMetadata({
       languages: {
         en: "/en",
         ru: "/ru",
-        he: "/he",
+        ro: "/ro",
       },
     },
   };
@@ -68,7 +68,7 @@ export default async function LocaleLayout({
   return (
     <html
       lang={locale}
-      dir={locale === "he" ? "rtl" : "ltr"}
+      dir="ltr"
       className={`${inter.variable} ${lora.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >

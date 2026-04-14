@@ -6,8 +6,8 @@ import path from "node:path";
 const messagesDir = path.resolve(__dirname, "../../messages");
 
 describe("@repo/i18n config", () => {
-  it("has 3 locales: en, ru, he", () => {
-    expect(locales).toEqual(["en", "ru", "he"]);
+  it("has 3 locales: en, ru, ro", () => {
+    expect(locales).toEqual(["en", "ru", "ro"]);
   });
 
   it("default locale is en", () => {
@@ -40,7 +40,7 @@ describe("@repo/i18n messages", () => {
       )
     ).sort();
 
-    for (const locale of ["ru", "he"] as const) {
+    for (const locale of ["ru", "ro"] as const) {
       const localeKeys = Object.keys(
         JSON.parse(
           fs.readFileSync(
@@ -60,7 +60,7 @@ describe("@repo/i18n messages", () => {
       )
     ).sort();
 
-    for (const locale of ["ru", "he"] as const) {
+    for (const locale of ["ru", "ro"] as const) {
       const localeKeys = Object.keys(
         JSON.parse(
           fs.readFileSync(
