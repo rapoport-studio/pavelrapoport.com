@@ -7,8 +7,8 @@ export function Footer() {
 
   return (
     <footer className="border-t border-grid mt-auto">
-      <div className="max-w-3xl mx-auto px-6 md:px-12 py-8 font-mono text-xs text-muted">
-        {t("footer")} · pavelrapoport.com · {new Date().getFullYear()}
+      <div className="max-w-3xl mx-auto px-6 md:px-12 py-8 font-mono text-xs text-muted text-center">
+        {t("footer")} · {new Date().getFullYear()}
       </div>
     </footer>
   );

@@ -1,9 +1,9 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { LanguageSwitcher } from "./LanguageSwitcher";
 
 const stack = ["Next.js 16", "Tailwind CSS 4", "MDX", "Cloudflare Pages"];
-const sections = ["/build", "/signal", "/layers", "/notes"];
 
 export function ComingSoon() {
   const t = useTranslations("web.comingSoon");
@@ -60,21 +60,12 @@ export function ComingSoon() {
             </div>
           </div>
 
-          {/* Categories */}
+          {/* Languages */}
           <div className="mb-unit-2">
             <div className="font-mono text-[10px] tracking-[0.15em] text-muted uppercase mb-3">
-              sections
+              languages
             </div>
-            <div className="flex gap-4">
-              {sections.map((cat) => (
-                <span
-                  key={cat}
-                  className="font-mono text-xs text-blueprint"
-                >
-                  {cat}
-                </span>
-              ))}
-            </div>
+            <LanguageSwitcher />
           </div>
 
           {/* Grid divider */}
