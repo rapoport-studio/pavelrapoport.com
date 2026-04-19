@@ -1,6 +1,5 @@
-import type { ForgeConfig } from '@repo/forge';
-
-const config: ForgeConfig = {
+/** @type {import('@repo/forge').ForgeConfig} */
+const config = {
   projectContextPath: './FORGE.md',
   issuePrefix: 'AI',
 };

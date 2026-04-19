@@ -4,7 +4,7 @@
 
 ## Purpose
 
-**What:** Project-agnostic Linear + Anthropic orchestrator exposed as a CLI (`audit`, `spec`, `review`, `estimate`). Bound at init time to a project-context markdown path and an issue-key prefix via `forge.config.{ts,mjs,js,json}` or env vars. Engine holds no consumer-specific business logic.
+**What:** Project-agnostic Linear + Anthropic orchestrator exposed as a CLI (`audit`, `spec`, `review`, `estimate`). Bound at init time to a project-context markdown path and an issue-key prefix via `forge.config.{mjs,js,json}` or env vars. Engine holds no consumer-specific business logic.
 
 **For whom:** Pavel (operator), AI agents (autonomous consumers), every future studio monorepo that needs the same pipeline.
 

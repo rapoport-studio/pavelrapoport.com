@@ -2,7 +2,7 @@
 
 Phase 0 scaffold at `packages/forge/` is already in place with the frozen public contract: `Forge` class, `initForge()` (async), `loadConfig()`, `getProjectContext()` (sync), `LinearClient` stub, `ForgeConfig`, `ForgeConfigError`. This change populates the body around that contract by porting VIVOD's `packages/forge-cli/src/` tree. Reconciliation burden concentrates in three places: project-context (VIVOD inline const → scaffold file-backed + lazy cache), Linear client shape (VIVOD functional module → scaffold class with `this.config.issuePrefix`), and the `VVD-` hardcode (literal → composition via `parseIssueKey` / `formatIssueKey`).
 
-Source of truth for the port: `/Users/pavelrapoport/Documents/GitHub/vivod/packages/forge-cli/src/`. The consumer (pavelrapoport.com) will provide `forge.config.ts` + `FORGE.md` at the monorepo root.
+Source of truth for the port: `/Users/pavelrapoport/Documents/GitHub/vivod/packages/forge-cli/src/`. The consumer (pavelrapoport.com) will provide `forge.config.mjs` + `FORGE.md` at the monorepo root.
 
 ## Goals / Non-Goals
 
