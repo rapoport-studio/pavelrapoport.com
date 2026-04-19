@@ -5,7 +5,6 @@ import { NextIntlClientProvider } from "next-intl";
 import { routing } from "@repo/i18n/routing";
 import { inter, lora, jetbrainsMono } from "../fonts";
 import "../globals.css";
-import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { GridOverlay } from "@/components/GridOverlay";
 import { BreakpointIndicator } from "@/components/dev/BreakpointIndicator";
@@ -74,8 +73,7 @@ export default async function LocaleLayout({
     >
       <body className="min-h-dvh flex flex-col bg-canvas text-ink font-serif">
         <NextIntlClientProvider messages={messages}>
-          <Header />
-          <main className="flex-1 max-w-(--container-content) w-full mx-auto px-6 md:px-12">
+          <main className="flex-1 flex max-w-(--container-content) w-full mx-auto px-6 md:px-12">
             {children}
           </main>
           <Footer />
