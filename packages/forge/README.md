@@ -35,26 +35,29 @@ Autonomous pipeline engine — project-agnostic core.
 Precedence (выше → перебивает):
 
 1. Explicit: `initForge({ projectContextPath, issuePrefix })`
-2. File: `forge.config.{ts,mjs,js,json}` — ближайший вверх по дереву от `cwd`
+2. File: `forge.config.{mjs,js,json}` — ближайший вверх по дереву от `cwd`
 3. Env: `FORGE_PROJECT_CONTEXT_PATH`, `FORGE_ISSUE_PREFIX`
 
 Если нет — `ForgeConfigError`.
 
 ## Использование
 
-**1. Создать `forge.config.ts` в корне монорепо:**
+**1. Создать `forge.config.mjs` в корне монорепо:**
 
-```ts
-// forge.config.ts
-import type { ForgeConfig } from '@repo/forge';
-
-const config: ForgeConfig = {
+```mjs
+// forge.config.mjs
+/** @type {import('@repo/forge').ForgeConfig} */
+const config = {
   projectContextPath: './FORGE.md',
   issuePrefix: 'AI',
 };
 
 export default config;
 ```
+
+> Готовый шаблон лежит в `packages/forge/forge.config.example.mjs` — скопировать в корень монорепо как `forge.config.mjs` и поправить значения.
+>
+> `.ts` не поддерживается намеренно: Node ESM-лоадер не умеет `.ts` без внешнего loader'а (`tsx` / `ts-node`). Типы подхватываются через JSDoc `@type` без TS-тулчейна.
 
 **2. Создать `FORGE.md`** — Markdown-описание монорепо (пакеты, конвенции, стек, naming, route-groups, branded ID prefixes). Этот файл уходит в промпты.
 

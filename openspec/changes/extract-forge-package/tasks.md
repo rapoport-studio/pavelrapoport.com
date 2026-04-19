@@ -20,7 +20,7 @@
 
 ## 4. Barrels, runtime deps, and namespace rename
 
-- [x] 4.1 Rename the package from `@rapoport-studio/forge` to `@repo/forge` in `packages/forge/package.json`, `packages/forge/README.md`, and `forge.config.example.ts` (both the import and the doc comment).
+- [x] 4.1 Rename the package from `@rapoport-studio/forge` to `@repo/forge` in `packages/forge/package.json`, `packages/forge/README.md`, and `forge.config.example.mjs` (both the import and the doc comment).
 - [x] 4.2 Extend `src/index.ts` and `src/core/index.ts` to export `LinearClient`, `parseIssueKey`, `formatIssueKey`, and the ported worker-prompt helpers; do not rename or remove any Phase 0 export. [parseIssueKey/formatIssueKey are LinearClient methods, exposed via LinearClient export; worker-prompts exposed via `./worker-prompts` subpath from package.json exports map]
 - [x] 4.3 Add runtime deps `@supabase/supabase-js`, `chalk`, and `glob` to `packages/forge/package.json`. Also added `vitest` devDep and `test` script.
 - [x] 4.4 Run `pnpm install` from the monorepo root and confirm the lockfile updates without churn.
@@ -44,7 +44,7 @@
 
 ## 7. Consumer wiring (pavelrapoport.com as first consumer)
 
-- [x] 7.1 Create `forge.config.ts` at the monorepo root with `{ issuePrefix: 'AI', projectContextPath: './FORGE.md' }`, importing `ForgeConfig` from `@repo/forge`.
+- [x] 7.1 Create `forge.config.mjs` at the monorepo root with `{ issuePrefix: 'AI', projectContextPath: './FORGE.md' }`, typed via JSDoc `@type {import('@repo/forge').ForgeConfig}` (no TS; Node ESM loader cannot run `.ts` directly).
 - [x] 7.2 Create `FORGE.md` at the monorepo root; seed from `packages/openspec/config.yaml` context block and `conventions.md`. Cover apps (`apps/web`, `apps/studio`), packages, stack (Next.js 15, React 19, Tailwind 4, Cloudflare Workers via `@opennextjs/cloudflare`), locales `en|ru|ro`, Infisical secrets rule, `getCloudflareContext()` vs `process.env`, Linear `AI-` prefix, and Supabase project `mtavnbjdgldttqdpwouo`.
 - [x] 7.3 Add a `forge` script to the root `package.json` that delegates to `pnpm --filter @repo/forge exec forge`.
 

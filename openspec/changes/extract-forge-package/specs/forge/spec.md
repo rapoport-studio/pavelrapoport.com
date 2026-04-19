@@ -2,16 +2,16 @@
 
 ### Requirement: Config resolution precedence
 
-Forge SHALL resolve configuration in the order: explicit `initForge()` options > `forge.config.{ts,mjs,js,json}` walked up from `process.cwd()` > environment variables `FORGE_PROJECT_CONTEXT_PATH` and `FORGE_ISSUE_PREFIX`. If no layer supplies a required field, Forge SHALL throw `ForgeConfigError`.
+Forge SHALL resolve configuration in the order: explicit `initForge()` options > `forge.config.{mjs,js,json}` walked up from `process.cwd()` > environment variables `FORGE_PROJECT_CONTEXT_PATH` and `FORGE_ISSUE_PREFIX`. If no layer supplies a required field, Forge SHALL throw `ForgeConfigError`.
 
 #### Scenario: Explicit options win over config file
-- **GIVEN** a `forge.config.ts` exists with `issuePrefix: 'VVD'`
+- **GIVEN** a `forge.config.mjs` exists with `issuePrefix: 'VVD'`
 - **WHEN** the consumer calls `initForge({ issuePrefix: 'AI', projectContextPath: './FORGE.md' })`
 - **THEN** `forge.config.issuePrefix` SHALL equal `'AI'`
 
 #### Scenario: File wins over environment
 - **GIVEN** env var `FORGE_ISSUE_PREFIX=VVD`
-- **AND** a `forge.config.ts` with `issuePrefix: 'AI'`
+- **AND** a `forge.config.mjs` with `issuePrefix: 'AI'`
 - **WHEN** the consumer calls `initForge()` with no options
 - **THEN** `forge.config.issuePrefix` SHALL equal `'AI'`
 
@@ -115,10 +115,10 @@ The engine's prompt corpus (audit-agent prompts under `commands/audit/prompts/`,
 
 ### Requirement: Config file discovery walks up the filesystem tree
 
-`loadConfig()` SHALL search for `forge.config.ts`, `forge.config.mjs`, `forge.config.js`, and `forge.config.json` starting at `process.cwd()` and walking up to the filesystem root, stopping at the first match. Only the matched file SHALL be loaded; configs at deeper ancestors SHALL be ignored.
+`loadConfig()` SHALL search for `forge.config.mjs`, `forge.config.js`, and `forge.config.json` starting at `process.cwd()` and walking up to the filesystem root, stopping at the first match. Only the matched file SHALL be loaded; configs at deeper ancestors SHALL be ignored. `.ts` is intentionally excluded — Node's native ESM loader cannot execute `.ts` without an external loader.
 
 #### Scenario: Monorepo-root config found from a sub-package cwd
-- **GIVEN** `/repo/forge.config.ts` exists
+- **GIVEN** `/repo/forge.config.mjs` exists
 - **AND** `process.cwd()` is `/repo/packages/forge`
 - **WHEN** `loadConfig()` runs
-- **THEN** it SHALL load `/repo/forge.config.ts` and not search any ancestor above `/repo`
+- **THEN** it SHALL load `/repo/forge.config.mjs` and not search any ancestor above `/repo`

@@ -24,7 +24,8 @@
     "forge": "./dist/cli.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "forge.config.example.mjs"
   ],
   "scripts": {
     "build": "tsc",

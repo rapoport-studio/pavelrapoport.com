@@ -26,7 +26,6 @@ export interface ForgeConfig {
 }
 
 const CONFIG_FILE_NAMES = [
-  'forge.config.ts',
   'forge.config.mjs',
   'forge.config.js',
   'forge.config.json',
@@ -42,7 +41,7 @@ export class ForgeConfigError extends Error {
 /**
  * Resolve `ForgeConfig` by precedence (higher wins):
  *   1. explicit options passed to this function
- *   2. forge.config.{ts,mjs,js,json} in cwd or any parent directory
+ *   2. forge.config.{mjs,js,json} in cwd or any parent directory
  *   3. env vars: FORGE_PROJECT_CONTEXT_PATH, FORGE_ISSUE_PREFIX
  *
  * Throws `ForgeConfigError` if required fields are missing or invalid.
@@ -85,7 +84,6 @@ async function readConfigFile(path: string): Promise<Partial<ForgeConfig>> {
     return JSON.parse(raw) as Partial<ForgeConfig>;
   }
 
-  // .ts requires a loader (tsx / ts-node / bundler) upstream; we simply import.
   const url = pathToFileURL(path).href;
   const mod = (await import(url)) as {
     default?: Partial<ForgeConfig>;
@@ -113,7 +111,7 @@ function validate(input: Partial<ForgeConfig>): ForgeConfig {
   if (missing.length) {
     throw new ForgeConfigError(
       `Forge config is missing required fields: ${missing.join(', ')}.\n` +
-        `Provide them via forge.config.{ts,mjs,js,json}, env vars ` +
+        `Provide them via forge.config.{mjs,js,json}, env vars ` +
         `(FORGE_PROJECT_CONTEXT_PATH, FORGE_ISSUE_PREFIX), or the options argument to initForge().`,
     );
   }

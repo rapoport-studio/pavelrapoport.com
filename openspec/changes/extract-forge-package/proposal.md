@@ -8,13 +8,13 @@ The studio owns a working autonomous CLI pipeline — `audit` / `spec` / `review
 - Replace every `PROJECT_CONTEXT` template-literal usage with a `getProjectContext()` call inside the builder function body (worker-safe, no fs at module load).
 - Replace every `VVD-` literal with composition via `config.issuePrefix` + `parseIssueKey` / `formatIssueKey`.
 - Strip VIVOD workspace deps (`@vivod/db`, `@vivod/domain`); inline narrow local types.
-- Rename package `@rapoport-studio/forge` → `@repo/forge` in `packages/forge/package.json`, `packages/forge/README.md`, and `forge.config.example.ts`.
-- Add consumer wiring on pavelrapoport.com: `forge.config.ts` + `FORGE.md` at monorepo root; `pnpm forge` script.
+- Rename package `@rapoport-studio/forge` → `@repo/forge` in `packages/forge/package.json`, `packages/forge/README.md`, and `forge.config.example.mjs`.
+- Add consumer wiring on pavelrapoport.com: `forge.config.mjs` + `FORGE.md` at monorepo root; `pnpm forge` script.
 
 ## Capabilities
 
 ### New Capabilities
-- `forge`: project-agnostic autonomous CLI pipeline (audit / spec / review / estimate) bound at init time to a project-context markdown path and a Linear issue-key prefix. Consumers inject configuration via `forge.config.{ts,mjs,js,json}` or env vars; engine contains no consumer-specific logic.
+- `forge`: project-agnostic autonomous CLI pipeline (audit / spec / review / estimate) bound at init time to a project-context markdown path and a Linear issue-key prefix. Consumers inject configuration via `forge.config.{mjs,js,json}` or env vars; engine contains no consumer-specific logic.
 
 ### Modified Capabilities
 
@@ -26,7 +26,7 @@ None — this change introduces a new domain only.
 - `packages/forge/package.json` — add runtime deps `@supabase/supabase-js`, `chalk`, `glob`; strip any `@vivod/*`; rename to `@repo/forge`.
 - `packages/openspec/config.yaml` — add `forge` to the domains list.
 - `packages/openspec/specs/forge/spec.md` — new domain spec (stub in this change; filled by archive).
-- `forge.config.ts` at monorepo root — binds forge to `issuePrefix: 'AI'` and `projectContextPath: './FORGE.md'`.
+- `forge.config.mjs` at monorepo root — binds forge to `issuePrefix: 'AI'` and `projectContextPath: './FORGE.md'`.
 - `FORGE.md` at monorepo root — project-context markdown describing apps, packages, stack (Next.js 15, React 19, Tailwind 4, CF Workers via `@opennextjs/cloudflare`), locales `en|ru|ro`, Infisical secrets rule, and Linear `AI-` prefix.
 - Root `package.json` — add `forge` script.
 - No DB migrations. No UI changes.
