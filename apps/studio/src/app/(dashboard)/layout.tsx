@@ -1,4 +1,4 @@
-import { getUser } from "@repo/auth";
+import { getSession, getUser } from "@repo/auth";
 import {
   SidebarInset,
   SidebarProvider,
@@ -14,17 +14,28 @@ export default async function DashboardLayout({
 }: {
   children: ReactNode;
 }) {
-  const user = await getUser();
+  const session = await getSession();
 
-  if (!user) {
+  if (!session?.user?.email) {
     redirect("/login?error=session_expired");
   }
 
-  const navUser = {
-    name: user.profile.display_name ?? user.email,
-    email: user.email,
-    avatarUrl: user.profile.avatar_url,
-  };
+  const email = session.user.email;
+  const user = await getUser();
+
+  const navUser = user
+    ? {
+        name: user.profile.display_name ?? email,
+        email,
+        avatarUrl: user.profile.avatar_url,
+        initial: (user.profile.display_name?.[0] ?? email[0]).toUpperCase(),
+      }
+    : {
+        name: email.split("@")[0],
+        email,
+        avatarUrl: null,
+        initial: email[0].toUpperCase(),
+      };
 
   return (
     <SidebarProvider>

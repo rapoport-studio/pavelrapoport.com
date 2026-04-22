@@ -17,6 +17,7 @@ type AppSidebarProps = {
     name: string;
     email: string;
     avatarUrl: string | null;
+    initial: string;
   };
 };
 
@@ -48,6 +49,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
           name={user.name}
           email={user.email}
           avatarUrl={user.avatarUrl}
+          initial={user.initial}
         />
       </SidebarFooter>
       <SidebarRail />

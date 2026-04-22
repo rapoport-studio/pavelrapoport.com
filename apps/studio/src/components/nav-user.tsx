@@ -29,18 +29,10 @@ type NavUserProps = {
   name: string;
   email: string;
   avatarUrl: string | null;
+  initial: string;
 };
 
-function initialsOf(name: string, email: string) {
-  const source = name.trim() || email;
-  const parts = source.split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[1][0]).toUpperCase();
-  }
-  return source.slice(0, 2).toUpperCase();
-}
-
-export function NavUser({ name, email, avatarUrl }: NavUserProps) {
+export function NavUser({ name, email, avatarUrl, initial }: NavUserProps) {
   const { isMobile } = useSidebar();
   const [, formAction, pending] = useActionState(async () => {
     await signOutAction();
@@ -59,7 +51,7 @@ export function NavUser({ name, email, avatarUrl }: NavUserProps) {
               <Avatar className="h-8 w-8 rounded-lg">
                 {avatarUrl ? <AvatarImage src={avatarUrl} alt={name} /> : null}
                 <AvatarFallback className="rounded-lg">
-                  {initialsOf(name, email)}
+                  {initial}
                 </AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
@@ -84,7 +76,7 @@ export function NavUser({ name, email, avatarUrl }: NavUserProps) {
                     <AvatarImage src={avatarUrl} alt={name} />
                   ) : null}
                   <AvatarFallback className="rounded-lg">
-                    {initialsOf(name, email)}
+                    {initial}
                   </AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
