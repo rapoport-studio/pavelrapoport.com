@@ -29,12 +29,13 @@
 
 ## 6. Wire studio middleware, config, login form
 
-- [ ] 6.1 In `packages/config/src/env.ts`, add `STUDIO_ALLOWED_EMAILS: z.string().min(1).optional()` to the Zod schema.
-- [ ] 6.2 In `packages/config/.env.example`, append `STUDIO_ALLOWED_EMAILS=` with a comment explaining the format (comma-separated emails).
-- [ ] 6.3 In `apps/studio/src/middleware.ts`, parse `process.env.STUDIO_ALLOWED_EMAILS` (split on comma, trim, lowercase, filter empty) and pass as `allowedEmails` to `createAuthProxy`.
-- [ ] 6.4 In `apps/studio/src/app/login/actions.ts`, add `signInWithGoogleAction()` returning `{ url, error }` — uses `NEXT_PUBLIC_SITE_URL` like `sendMagicLink` does.
-- [ ] 6.5 In `apps/studio/src/app/login/login-form.tsx`, add a "Continue with Google" button above the magic link form. Wire via `useActionState` + `useEffect(() => window.location.assign(state.url))`. Add a neutral divider between the two methods.
-- [ ] 6.6 In `apps/studio/src/app/login/page.tsx`, read `searchParams` (App Router async prop in Next.js 16 — check `node_modules/next/dist/docs/` first), render a small error banner for `error=not_authorized` and `error=auth_failed`.
+- [ ] 6.1 In `packages/config/src/env.ts`, add `NODE_ENV: z.enum(["development","staging","production","test"]).optional()` and `STUDIO_ALLOWED_EMAILS: z.string().optional()` to the Zod schema, then chain `.refine(...)` on the object so the env var is required when `NODE_ENV === "production"` (message: `STUDIO_ALLOWED_EMAILS must be set in production`, path: `["STUDIO_ALLOWED_EMAILS"]`).
+- [ ] 6.2 In `packages/config/.env.example`, append `STUDIO_ALLOWED_EMAILS=` with a comment explaining the format (comma-separated emails, required in production).
+- [ ] 6.3 In `apps/studio/src/middleware.ts`, parse `process.env.STUDIO_ALLOWED_EMAILS` (split on comma, trim, lowercase, filter empty) and pass as `allowedEmails` to `createAuthProxy`. Add a module-load guard: when `NODE_ENV === "production"` and `allowedEmails.length === 0`, throw `STUDIO_ALLOWED_EMAILS must be set in production; refusing to start studio middleware.` so the worker fails closed instead of silently disabling the whitelist.
+- [ ] 6.4 In `packages/config/src/__tests__/env.test.ts`, add three cases for the production guard: NODE_ENV=production + STUDIO_ALLOWED_EMAILS missing → throws, NODE_ENV=production + empty string → throws, NODE_ENV=development + missing → passes.
+- [ ] 6.5 In `apps/studio/src/app/login/actions.ts`, add `signInWithGoogleAction()` returning `{ url, error }` — uses `NEXT_PUBLIC_SITE_URL` like `sendMagicLink` does.
+- [ ] 6.6 In `apps/studio/src/app/login/login-form.tsx`, add a "Continue with Google" button above the magic link form. Wire via `useActionState` + `useEffect(() => window.location.assign(state.url))`. Add a neutral divider between the two methods.
+- [ ] 6.7 In `apps/studio/src/app/login/page.tsx`, read `searchParams` (App Router async prop in Next.js 16 — check `node_modules/next/dist/docs/` first), render a small error banner for `error=not_authorized` and `error=auth_failed`.
 
 ## 7. Verification
 

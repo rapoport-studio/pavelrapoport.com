@@ -48,4 +48,5 @@ _None._ Auth methods are defined in an existing requirement; this change extends
 - Client auth on `pavelrapoport.com` (separate future change).
 - `profiles.role`-backed whitelist (env var is MVP; DB-backed roles land with client portal work).
 - RLS policies, `auth_events` audit trail, TOTP enrollment, SMS/WhatsApp OTP, GDPR data-rights endpoints — all deferred to their own changes.
-- Production guardrail enforcing non-empty `STUDIO_ALLOWED_EMAILS` at build/deploy time — tracked in the spec as tech debt.
+
+Production fail-closed is **in scope** (not deferred): `@repo/config` Zod schema requires `STUDIO_ALLOWED_EMAILS` when `NODE_ENV === "production"`, and the studio middleware throws at module load if the worker boots without it. Schema + runtime guard in tandem.
