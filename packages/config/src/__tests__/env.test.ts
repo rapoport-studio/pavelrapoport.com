@@ -48,3 +48,37 @@ describe("env proxy", () => {
     expect(env.SUPABASE_URL).toBe("https://proxy-test.supabase.co");
   });
 });
+
+describe("STUDIO_ALLOWED_EMAILS production guard", () => {
+  it("throws when NODE_ENV=production and STUDIO_ALLOWED_EMAILS is missing", async () => {
+    for (const [key, value] of Object.entries(REQUIRED_ENV)) {
+      vi.stubEnv(key, value);
+    }
+    vi.stubEnv("NODE_ENV", "production");
+    const { validateEnv } = await import("../env");
+    expect(() => validateEnv()).toThrow(
+      "STUDIO_ALLOWED_EMAILS must be set in production"
+    );
+  });
+
+  it("throws when NODE_ENV=production and STUDIO_ALLOWED_EMAILS is empty", async () => {
+    for (const [key, value] of Object.entries(REQUIRED_ENV)) {
+      vi.stubEnv(key, value);
+    }
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("STUDIO_ALLOWED_EMAILS", "");
+    const { validateEnv } = await import("../env");
+    expect(() => validateEnv()).toThrow(
+      "STUDIO_ALLOWED_EMAILS must be set in production"
+    );
+  });
+
+  it("passes when NODE_ENV=development and STUDIO_ALLOWED_EMAILS is missing", async () => {
+    for (const [key, value] of Object.entries(REQUIRED_ENV)) {
+      vi.stubEnv(key, value);
+    }
+    vi.stubEnv("NODE_ENV", "development");
+    const { validateEnv } = await import("../env");
+    expect(() => validateEnv()).not.toThrow();
+  });
+});

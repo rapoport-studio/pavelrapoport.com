@@ -53,8 +53,11 @@ The system SHALL enforce route-level access control by role, and — until `prof
 - **AND** if the email is not in the list, middleware calls `supabase.auth.signOut()` and redirects to `/login?error=not_authorized`
 - **AND** if `STUDIO_ALLOWED_EMAILS` is empty or unset, the whitelist check is skipped (dev fallback) and any valid session is allowed
 
-#### Scenario: Empty whitelist in production
-- **GIVEN** `STUDIO_ALLOWED_EMAILS` is empty or unset in the production `rapoport-studio` worker
-- **THEN** this is a misconfiguration: any registered Supabase user could access studio
-- **AND** a future change SHALL add a build-time or deploy-time guard that fails CI when the variable is missing in production — tracked as tech debt
+#### Scenario: Empty whitelist in production — fail-closed
+- **GIVEN** `STUDIO_ALLOWED_EMAILS` is empty or unset
+- **AND** `NODE_ENV === "production"`
+- **WHEN** the studio worker boots and `apps/studio/src/middleware.ts` is loaded
+- **THEN** the module throws `STUDIO_ALLOWED_EMAILS must be set in production; refusing to start studio middleware.`
+- **AND** Cloudflare Workers refuses to serve requests against that deployment
+- **AND** independently, `@repo/config`'s Zod schema refine fails validation with `STUDIO_ALLOWED_EMAILS must be set in production` whenever `validateEnv()` is invoked (belt-and-suspenders for future boot-time validators)
 - **AND** the long-term replacement is `profiles.role = 'admin'` per Requirement: Roles, landing with the client portal change
