@@ -1,0 +1,155 @@
+{
+  "$schema": "timeline-data/v1",
+  "periods": [
+    {
+      "id": "origin-pioneer-palace",
+      "type": "formative",
+      "startYear": 1990,
+      "endYear": 1990,
+      "organization": "Pioneer Palace",
+      "role": "Self-taught programmer",
+      "location": "Chișinău, Moldova SSR",
+      "tech": ["Basic", "ДВК"],
+      "summary": "Wrote first game — Arkanoid — in Basic on a ДВК computer in the abandoned observatory of the Pioneer Palace. Placed second in the district math olympiad the same year. Age 10.",
+      "notable": ["First program", "District math olympiad, 2nd place"]
+    },
+    {
+      "id": "midicom-2003",
+      "type": "work",
+      "startYear": 2003,
+      "endYear": 2006,
+      "organization": "MidiCom Technology",
+      "role": "Web Developer",
+      "location": "Israel",
+      "tech": ["SQL Server", "ADO.NET", "C#", "ASP.NET"],
+      "summary": "First professional job. Built and maintained the e-commerce site for an Asus and ZALMAN distributor. Ran email marketing campaigns."
+    },
+    {
+      "id": "webstudio-2008",
+      "type": "work",
+      "startYear": 2008,
+      "endYear": 2009,
+      "organization": "WebStudio",
+      "role": "Frontend Developer",
+      "location": "Israel",
+      "tech": ["HTML", "CSS", "JavaScript", "CMS"],
+      "summary": "BabyTv.com — 40+ modules, CMS, multilingual content. First large CMS project and first exposure to multilingual content work, a thread that reappeared in every later role.",
+      "notable": ["BabyTv.com CMS"]
+    },
+    {
+      "id": "onelement-2009",
+      "type": "work",
+      "startYear": 2009,
+      "endYear": 2010,
+      "organization": "OnElement",
+      "role": "Designer + Developer",
+      "location": "Israel",
+      "tech": ["Flash", "ActionScript 3"],
+      "summary": "Flash-based 3D online configurator for event tables. Combined design and development. First contact with visual programming in the browser — the early seed of the data-visualization specialty that followed."
+    },
+    {
+      "id": "interminds-2010",
+      "type": "work",
+      "startYear": 2010,
+      "endYear": 2011,
+      "organization": "Interminds",
+      "role": "Full-stack Developer",
+      "location": "Israel",
+      "tech": ["SQL Server", "ADO.NET", "Entity Framework", "REST", "JSON"],
+      "summary": "Reverse-auction marketplace Bidsarena.com. Full stack end-to-end: database, API, frontend, CMS. Understanding of the marketplace model."
+    },
+    {
+      "id": "soluto-2011",
+      "type": "work",
+      "startYear": 2011,
+      "endYear": 2013,
+      "organization": "Soluto",
+      "role": "Frontend Developer",
+      "location": "Tel Aviv, Israel",
+      "summary": "Web portal for cloud-based PC remote management and diagnostics. Helped ordinary users solve technical problems on their devices. First taste of a mass-audience SaaS product. Acquired by Asurion for ~$100–130M; 3M+ downloads; TechCrunch Disrupt 2010 winner.",
+      "notable": ["Acquired by Asurion ~$100–130M", "TechCrunch Disrupt winner"]
+    },
+    {
+      "id": "wibbitz-2012",
+      "type": "work",
+      "startYear": 2012,
+      "endYear": 2015,
+      "organization": "Wibbitz",
+      "role": "Frontend Developer",
+      "location": "Tel Aviv, Israel",
+      "tech": ["HTML5 Canvas", "CreateJS", "JavaScript"],
+      "summary": "Web player and editor UI for an AI text-to-video platform. Canvas-based rendering, timeline editor, real-time media work. Clients included Bloomberg, Reuters, HubSpot, Condé Nast. Acquired by Vimeo (2021). Grand Prix UNESCO; Best Mobile Publishing Product at MWC Barcelona.",
+      "notable": ["Acquired by Vimeo", "Grand Prix UNESCO"]
+    },
+    {
+      "id": "xplenty-2014",
+      "type": "work",
+      "startYear": 2014,
+      "endYear": 2018,
+      "organization": "Xplenty",
+      "role": "Front-End Team Leader",
+      "location": "Tel Aviv, Israel",
+      "tech": ["SVG", "Backbone.js", "Angular"],
+      "summary": "Built the SVG-based visual editor for data pipelines — core product feature. Led the frontend team through a Backbone.js → Angular migration. Later merged with DreamFactory, FlyData and Intermix.io into Integrate.io.",
+      "notable": ["Front-End Team Leader", "Core pipeline editor"]
+    },
+    {
+      "id": "perimeter81-2018",
+      "type": "work",
+      "startYear": 2018,
+      "endYear": 2019,
+      "organization": "Perimeter 81",
+      "role": "Design System Architect",
+      "location": "Tel Aviv, Israel",
+      "tech": ["React", "TypeScript", "Storybook", "Figma"],
+      "summary": "Built a design system from scratch for three platforms (Web App, CRM, Landing Portals) in under a year. Figma → Storybook sync. Hired and trained the frontend team from interns. Acquired by Check Point for $490M.",
+      "notable": ["Design system shipped solo", "Acquired by Check Point $490M"]
+    },
+    {
+      "id": "brand-dna-2019",
+      "type": "founder",
+      "startYear": 2019,
+      "endYear": 2019,
+      "organization": "brand DNA",
+      "role": "Founder, VP R&D",
+      "location": "Israel",
+      "summary": "Theme manager for digital brands — productizing the design-system practice as shared visual language between designers and developers. 4-person team, REST API infrastructure. Attempt to turn a repeated deliverable into a product of its own."
+    },
+    {
+      "id": "quickwork-2019",
+      "type": "founder",
+      "startYear": 2019,
+      "endYear": 2020,
+      "organization": "QuickWork",
+      "role": "Co-Founder, VP R&D",
+      "location": "Israel",
+      "tech": ["React", "Node.js"],
+      "summary": "Marketplace for blue-collar hiring — cleaning, moving, hospitality. Real-time matching, scheduling, payments. Full product ownership from idea to investor pitch that secured funding."
+    },
+    {
+      "id": "zerto-2020",
+      "type": "work",
+      "startYear": 2020,
+      "endYear": 2022,
+      "organization": "Zerto",
+      "role": "Frontend Architect",
+      "location": "Herzliya, Israel",
+      "tech": ["React", "TypeScript", "Redux Toolkit", "D3.js", "AG Grid"],
+      "summary": "Led AngularJS 1.5 → React migration. Built @zerto/shared-fe design system: 56+ components across 4 apps, Atomic Design, dual-format npm package. D3.js topology graphs, heatmaps, real-time RPO monitoring. Acquired by HPE for $374M.",
+      "notable": ["Frontend Architect", "@zerto/shared-fe", "Acquired by HPE $374M"]
+    },
+    {
+      "id": "hpe-2022",
+      "type": "work",
+      "startYear": 2022,
+      "endYear": null,
+      "ongoing": true,
+      "organization": "HPE — Hewlett Packard Enterprise",
+      "role": "Tech Lead, Frontend Architect",
+      "location": "Herzliya, Israel → Chișinău, Moldova",
+      "tech": ["React", "TypeScript", "Kubernetes", "Docker", "Helm"],
+      "summary": "Lead contributor on the Zerto micro-application inside HPE GreenLake Storage Console. 1,498 commits (34%) on the final product. Cross-origin ShellAPI bridge, RBAC, 12 feature flags, Keycloak SSO. Transition from IC to Tech Lead. Began documentation-first, AI-assisted delivery workflow.",
+      "notable": ["Tech Lead", "1,498 commits (34%)", "AI-assisted workflow"]
+    }
+  ]
+}
