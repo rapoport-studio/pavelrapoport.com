@@ -1,7 +1,7 @@
 import { useTranslations } from "next-intl";
 
+import { CareerBlock } from "./career-block";
 import { OriginAct } from "./origin-act";
-import { TimelineWithList } from "./timeline-with-list";
 
 /**
  * AboutSection — page-level assembly for the homepage About region.
@@ -50,9 +50,9 @@ export function AboutSection({
         />
       </div>
 
-      <div data-slot="career-block" className="mt-16">
-        {/* §6.3 — Career intro paragraph lands above the strip */}
-        <TimelineWithList
+      <div data-slot="career-block" className="mt-20">
+        <CareerBlock
+          intro={t("career.intro")}
           axisEndYear={axisEndYear}
           axisLabel={axisLabel}
           presentLabel={presentLabel}
