@@ -2,10 +2,16 @@ import { AboutSection } from "@/components/about/about-section";
 
 const CURRENT_YEAR = 2026;
 
-// TEMP: replaced by full <AboutSection /> wiring (with next-intl
-// resolution) in §7. Tracking: this branch's §6.
-// AboutSection is the canonical wrapper; Origin / Career intro / Pivot
-// fill in across §6.2–§6.4.
+/**
+ * Homepage. AboutSection is the primary content of pavelrapoport.com:
+ * the three-act narrative (Origin → Career → Pivot) anchored at #about.
+ *
+ * `axisLabel` and `presentLabel` are passed as English literals for now.
+ * They live outside the home.about.* i18n namespace approved in §3 — a
+ * follow-up commit can localize them once the strings are reviewed.
+ * Period metadata (orgs, roles, summaries) intentionally stays English
+ * across locales per the spec.
+ */
 export default function TimelinePage() {
   return (
     <main className="min-h-screen bg-background text-foreground">
