@@ -59,7 +59,7 @@ function PeriodListItem({
   return (
     <article
       id={`period-${id}`}
-      tabIndex={-1}
+      tabIndex={0}
       data-slot="period-list-item"
       data-highlighted={highlighted ? "true" : "false"}
       className={cn(

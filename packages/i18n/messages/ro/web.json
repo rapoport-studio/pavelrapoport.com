@@ -14,10 +14,12 @@
         "body": "Aveam zece ani. Internetul încă nu ajunsese la Chișinău. Am scris primul meu joc — Arkanoid — în Basic, pe un ДВК. În același an am luat locul doi la olimpiada raională de matematică.\n\nDe atunci scriu cod. Treizeci și cinci de ani."
       },
       "career": {
+        "srHeading": "Cariera",
         "intro": "Israel. Douăzeci și șase de ani. Două startup-uri fondate de mine. Un design system livrat de unul singur în mai puțin de un an. Șase ani ca Frontend Architect la Zerto, trecând prin achiziția HPE. 1.498 de commit-uri în produsul final.",
         "timeline": {
           "axisLabel": "Cariera mea, din 2000 până în prezent",
-          "presentLabel": "prezent"
+          "presentLabel": "prezent",
+          "description": "Șaisprezece perioade de carieră, din 1990 până în 2026. Fiecare pătrat este o perioadă, pătratele mai mari marchează perioadele cheie. Pătratul detașat din stânga marchează originea din 1990, conectat de axa principală 2000–2026 printr-o linie punctată."
         }
       },
       "pivot": {

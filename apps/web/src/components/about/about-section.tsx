@@ -52,9 +52,11 @@ export function AboutSection({ axisEndYear }: AboutSectionProps) {
 
       <div data-slot="career-block" className="mt-20">
         <CareerBlock
+          srHeading={t("career.srHeading")}
           intro={t("career.intro")}
           axisEndYear={axisEndYear}
           axisLabel={t("career.timeline.axisLabel")}
+          axisDescription={t("career.timeline.description")}
           presentLabel={t("career.timeline.presentLabel")}
         />
       </div>

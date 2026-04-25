@@ -43,8 +43,10 @@ export interface TimelineStripProps {
   axisStartYear?: number
   /** Year of the rightmost main-axis tick. Required (caller passes the current year). */
   axisEndYear: number
-  /** SVG aria-label. Required for accessibility. */
+  /** Short SVG label, rendered as <title>. Required for accessibility. */
   axisLabel: string
+  /** Longer SVG description, rendered as <desc>. Required for accessibility. */
+  axisDescription: string
   /** Click + Enter handler. Default scrolls to `#period-{id}` and focuses it. */
   onActivate?: (id: string) => void
   className?: string
@@ -118,6 +120,7 @@ function TimelineStrip({
   axisStartYear = 2000,
   axisEndYear,
   axisLabel,
+  axisDescription,
   onActivate,
   className,
 }: TimelineStripProps) {
@@ -132,6 +135,12 @@ function TimelineStrip({
       className={cn("h-auto w-full", className)}
       data-slot="timeline-strip"
     >
+      {/* SVG-native accessibility: <title> mirrors aria-label as a
+          fallback for older assistive tech, <desc> adds the longer
+          summary. <title> must be the first child to be picked up
+          reliably across screen readers. */}
+      <title>{axisLabel}</title>
+      <desc>{axisDescription}</desc>
       {/* Detached → main bridge (dotted) */}
       <line
         x1={BRIDGE_LEFT}

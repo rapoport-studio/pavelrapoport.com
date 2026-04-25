@@ -18,6 +18,7 @@ export default function AboutPreviewPage() {
       <TimelineWithList
         axisEndYear={CURRENT_YEAR}
         axisLabel="Career timeline 2000–2026, with 1990 origin"
+        axisDescription="Sixteen career periods from 1990 to 2026. Each square represents one period. The detached square at the far left is the 1990 origin moment."
         presentLabel="present"
       />
     </main>

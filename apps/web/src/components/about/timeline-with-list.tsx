@@ -28,20 +28,36 @@ export interface TimelineWithListProps {
   axisStartYear?: number;
   /** Year of the rightmost main-axis tick (typically the current year). */
   axisEndYear: number;
-  /** SVG aria-label for the strip. */
+  /** SVG <title> — short label announced by screen readers. */
   axisLabel: string;
+  /** SVG <desc> — longer description of what the strip shows. */
+  axisDescription: string;
   /** Label used in place of an end year for ongoing periods (e.g. "present"). */
   presentLabel: string;
 }
 
-function buildTooltip(period: Period, presentLabel: string): string {
-  return `${period.organization} · ${formatYears(period, presentLabel)}`;
+// Tooltip stays in English regardless of locale because every component
+// of it (org, role, year-range) is canonical English metadata per spec.
+// "present" stays English here too so the tooltip is locale-stable.
+function buildTooltip(period: Period): string {
+  const startYear = getStartYear(period);
+  const endYear = period.ongoing
+    ? "present"
+    : period.end
+      ? Number.parseInt(period.end.slice(0, 4), 10)
+      : startYear;
+  const years =
+    typeof endYear === "number" && endYear === startYear
+      ? `${startYear}`
+      : `${startYear} – ${endYear}`;
+  return `${period.role} at ${period.organization}, ${years}`;
 }
 
 export function TimelineWithList({
   axisStartYear = 2000,
   axisEndYear,
   axisLabel,
+  axisDescription,
   presentLabel,
 }: TimelineWithListProps) {
   // Strip: chronological order (matches tab-order requirement).
@@ -50,7 +66,7 @@ export function TimelineWithList({
     startYear: getStartYear(p),
     tw: getPeriodTextClass(p),
     highlighted: isPeriodHighlighted(p),
-    tooltip: buildTooltip(p, presentLabel),
+    tooltip: buildTooltip(p),
   }));
 
   // List: newest-first per spec ("Origin at the bottom").
@@ -63,6 +79,7 @@ export function TimelineWithList({
         axisStartYear={axisStartYear}
         axisEndYear={axisEndYear}
         axisLabel={axisLabel}
+        axisDescription={axisDescription}
       />
       <ol className="flex flex-col">
         {listPeriods.map((p) => (
