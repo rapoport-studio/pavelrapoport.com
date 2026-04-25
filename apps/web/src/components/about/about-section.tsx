@@ -7,14 +7,19 @@ import { PivotAct } from "./pivot-act";
 /**
  * AboutSection — page-level assembly for the homepage About region.
  *
- * Layout shell with three vertical slots: Origin act (live as of §6.2),
- * Career block (intro + strip + list — intro lands in §6.3), Pivot act
- * (lands in §6.4).
+ * Layout shell with three vertical slots: Origin act, Career block
+ * (intro + strip + list), Pivot act.
  *
  * This file is the seam between i18n / data and the @repo/ui primitives.
- * It calls `useTranslations("home.about")` and passes resolved strings
- * down to its children. The @repo/ui components below stay free of
- * next-intl imports per spec.
+ * It calls `useTranslations("web.home.about")` and resolves every
+ * user-facing string here — including the SVG aria-label and the
+ * "present" indicator for ongoing periods — before passing them down
+ * as props. The @repo/ui components below stay free of next-intl
+ * imports per spec.
+ *
+ * `axisEndYear` is the only prop because "the current year" is a page-
+ * level runtime concern, not i18n. Everything else flows from the
+ * locale's web.home.about.* namespace.
  *
  * Anchor: id="about". When the homepage gets a top-nav (separate
  * follow-up issue, not this change), the nav's "About" link targets
@@ -23,15 +28,9 @@ import { PivotAct } from "./pivot-act";
 
 export interface AboutSectionProps {
   axisEndYear: number;
-  axisLabel: string;
-  presentLabel: string;
 }
 
-export function AboutSection({
-  axisEndYear,
-  axisLabel,
-  presentLabel,
-}: AboutSectionProps) {
+export function AboutSection({ axisEndYear }: AboutSectionProps) {
   const t = useTranslations("web.home.about");
 
   return (
@@ -55,8 +54,8 @@ export function AboutSection({
         <CareerBlock
           intro={t("career.intro")}
           axisEndYear={axisEndYear}
-          axisLabel={axisLabel}
-          presentLabel={presentLabel}
+          axisLabel={t("career.timeline.axisLabel")}
+          presentLabel={t("career.timeline.presentLabel")}
         />
       </div>
 

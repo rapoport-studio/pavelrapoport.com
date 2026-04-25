@@ -14,7 +14,11 @@
         "body": "I was ten years old. There was no internet in Chișinău yet. I wrote my first game — Arkanoid — in Basic, on a ДВК. The same year, I placed second in the district math olympiad.\n\nI've been writing code ever since. Thirty-five years."
       },
       "career": {
-        "intro": "Israel. Twenty-six years. Two startups I founded. A design system shipped alone in under a year. Six years as Frontend Architect at Zerto, through the HPE acquisition. 1,498 commits on the final product."
+        "intro": "Israel. Twenty-six years. Two startups I founded. A design system shipped alone in under a year. Six years as Frontend Architect at Zerto, through the HPE acquisition. 1,498 commits on the final product.",
+        "timeline": {
+          "axisLabel": "Career timeline, 2000 to present",
+          "presentLabel": "present"
+        }
       },
       "pivot": {
         "headline": "In 2026, I stopped writing code by hand.",
