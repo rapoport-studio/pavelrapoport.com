@@ -118,6 +118,57 @@ export function formatLocation(loc: Location): string {
   return loc.city ? `${loc.city}, ${loc.country}` : loc.country;
 }
 
+// Year-range label for the period list. Uses an en-dash (U+2013) per
+// the design convention; "present" for ongoing periods.
+export function formatYears(period: Period, presentLabel: string): string {
+  const startYear = getStartYear(period);
+  if (period.ongoing) return `${startYear} – ${presentLabel}`;
+  if (period.end === null) return `${startYear}`;
+  const endYear = Number.parseInt(period.end.slice(0, 4), 10);
+  return endYear === startYear ? `${startYear}` : `${startYear} – ${endYear}`;
+}
+
+// Highlighting rule per spec: founder | business types, ongoing, OR
+// any notable[]. Architect/Lead roles are signaled by the accent token
+// (accent-architect) rather than the highlighted flag.
+export function isPeriodHighlighted(period: Period): boolean {
+  return (
+    period.type === "founder" ||
+    period.type === "business" ||
+    period.ongoing ||
+    (period.notable !== undefined && period.notable.length > 0)
+  );
+}
+
+// Static class maps. Tailwind 4 JIT scans for literal class strings —
+// dynamic concatenation like `text-${token}` would not emit utilities.
+// Keeping these literal so every accent class lands in the build.
+const ACCENT_TEXT_CLASSES: Record<AccentToken, string> = {
+  "accent-origin": "text-accent-origin",
+  "accent-founder": "text-accent-founder",
+  "accent-architect": "text-accent-architect",
+  "accent-current": "text-accent-current",
+  "text-tertiary": "text-text-tertiary",
+  "text-quaternary": "text-text-quaternary",
+};
+
+const ACCENT_BORDER_CLASSES: Record<AccentToken, string> = {
+  "accent-origin": "border-l-accent-origin",
+  "accent-founder": "border-l-accent-founder",
+  "accent-architect": "border-l-accent-architect",
+  "accent-current": "border-l-accent-current",
+  "text-tertiary": "border-l-text-tertiary",
+  "text-quaternary": "border-l-text-quaternary",
+};
+
+export function getPeriodTextClass(period: Period): string {
+  return ACCENT_TEXT_CLASSES[getPeriodAccent(period)];
+}
+
+export function getPeriodBorderClass(period: Period): string {
+  return ACCENT_BORDER_CLASSES[getPeriodAccent(period)];
+}
+
 // Validate once at module load. Throws and halts the RSC build on any
 // schema violation — matches the spec requirement that the build SHALL
 // fail loudly on missing or invalid timeline data.

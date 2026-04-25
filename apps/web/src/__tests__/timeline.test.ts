@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   formatLocation,
+  formatYears,
   getEndYear,
   getPeriodAccent,
+  getPeriodBorderClass,
+  getPeriodTextClass,
   getStartYear,
+  isPeriodHighlighted,
   PeriodSchema,
   timeline,
   type Period,
@@ -157,6 +161,107 @@ describe("formatLocation", () => {
 
   it("returns country only when city is absent (IDF)", () => {
     expect(formatLocation({ country: "Israel" })).toBe("Israel");
+  });
+});
+
+describe("formatYears", () => {
+  it("returns single year when start equals end", () => {
+    expect(
+      formatYears({ ...basePeriod, start: "1990", end: "1990" }, "present"),
+    ).toBe("1990");
+  });
+
+  it("returns range with en-dash for multi-year periods", () => {
+    expect(
+      formatYears({ ...basePeriod, start: "2003", end: "2007" }, "present"),
+    ).toBe("2003 – 2007");
+  });
+
+  it("uses present label for ongoing periods", () => {
+    expect(
+      formatYears(
+        { ...basePeriod, start: "2026", end: null, ongoing: true },
+        "present",
+      ),
+    ).toBe("2026 – present");
+  });
+
+  it("respects locale-specific present label", () => {
+    expect(
+      formatYears(
+        { ...basePeriod, start: "2026", end: null, ongoing: true },
+        "сейчас",
+      ),
+    ).toBe("2026 – сейчас");
+  });
+});
+
+describe("isPeriodHighlighted", () => {
+  it("highlights founder type", () => {
+    expect(isPeriodHighlighted({ ...basePeriod, type: "founder" })).toBe(true);
+  });
+
+  it("highlights business type (LANFUN)", () => {
+    expect(isPeriodHighlighted({ ...basePeriod, type: "business" })).toBe(true);
+  });
+
+  it("highlights ongoing periods", () => {
+    expect(
+      isPeriodHighlighted({ ...basePeriod, end: null, ongoing: true }),
+    ).toBe(true);
+  });
+
+  it("highlights periods with notable[]", () => {
+    expect(
+      isPeriodHighlighted({ ...basePeriod, notable: ["Some flag"] }),
+    ).toBe(true);
+  });
+
+  it("does NOT highlight plain work without notable", () => {
+    expect(isPeriodHighlighted(basePeriod)).toBe(false);
+  });
+});
+
+describe("class-map plumbing", () => {
+  it("maps formative period to text-accent-origin / border-l-accent-origin", () => {
+    const p = { ...basePeriod, type: "formative" as const };
+    expect(getPeriodTextClass(p)).toBe("text-accent-origin");
+    expect(getPeriodBorderClass(p)).toBe("border-l-accent-origin");
+  });
+
+  it("maps founder to accent-founder classes", () => {
+    const p = { ...basePeriod, type: "founder" as const };
+    expect(getPeriodTextClass(p)).toBe("text-accent-founder");
+    expect(getPeriodBorderClass(p)).toBe("border-l-accent-founder");
+  });
+
+  it("maps business to accent-founder classes (LANFUN)", () => {
+    const p = { ...basePeriod, type: "business" as const };
+    expect(getPeriodTextClass(p)).toBe("text-accent-founder");
+    expect(getPeriodBorderClass(p)).toBe("border-l-accent-founder");
+  });
+
+  it("maps military to text-quaternary classes (IDF)", () => {
+    const p = { ...basePeriod, type: "military" as const };
+    expect(getPeriodTextClass(p)).toBe("text-text-quaternary");
+    expect(getPeriodBorderClass(p)).toBe("border-l-text-quaternary");
+  });
+
+  it("maps work + Architect role to accent-architect classes", () => {
+    const p = { ...basePeriod, role: "Frontend Architect" };
+    expect(getPeriodTextClass(p)).toBe("text-accent-architect");
+    expect(getPeriodBorderClass(p)).toBe("border-l-accent-architect");
+  });
+
+  it("maps plain work to text-tertiary classes", () => {
+    expect(getPeriodTextClass(basePeriod)).toBe("text-text-tertiary");
+    expect(getPeriodBorderClass(basePeriod)).toBe("border-l-text-tertiary");
+  });
+
+  it("ongoing override returns accent-current classes", () => {
+    const p = { ...basePeriod, end: null, ongoing: true };
+    expect(getPeriodTextClass(p)).toBe("text-accent-current");
+    expect(getPeriodBorderClass(p)).toBe("border-l-accent-current");
   });
 });
 
