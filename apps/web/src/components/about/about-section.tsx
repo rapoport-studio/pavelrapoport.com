@@ -2,6 +2,7 @@ import { useTranslations } from "next-intl";
 
 import { CareerBlock } from "./career-block";
 import { OriginAct } from "./origin-act";
+import { PivotAct } from "./pivot-act";
 
 /**
  * AboutSection — page-level assembly for the homepage About region.
@@ -59,8 +60,12 @@ export function AboutSection({
         />
       </div>
 
-      {/* §6.4 — PivotAct lands here */}
-      <div data-slot="pivot-act" className="mt-16" />
+      <div data-slot="pivot-act" className="mt-20">
+        <PivotAct
+          headline={t("pivot.headline")}
+          body={t("pivot.body")}
+        />
+      </div>
     </section>
   );
 }
